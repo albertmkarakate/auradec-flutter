@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../../core/constants.dart';
 import '../../core/track.dart';
 import '../../controllers/library_controller.dart';
+import '../widgets/auradec_mark.dart';
+import 'analytics_screen.dart';
 import '../../controllers/player_controller.dart';
 import '../widgets/track_tile.dart';
 import '../widgets/album_art.dart';
@@ -28,6 +30,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   String _activeTab = 'tracks';
   _SortMode _sortMode = _SortMode.title;
   bool _sortAsc = true;
+  bool _gridLayout = true; // grid for albums, list for tracks
 
   @override
   void initState() {
@@ -87,23 +90,15 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _logomark() {
-    return Container(
-      width: 32, height: 32,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        color: kBrandOrange,
-      ),
-      child: const Icon(Icons.music_note, color: Colors.white, size: 18),
-    );
-  }
+  Widget _logomark() => const AuradecMark(size: 32);
 
   Widget _toolbarActions() {
     return Row(children: [
       IconButton(
-        icon: const Icon(Icons.folder_special_outlined, color: kBrandOrange, size: 22),
-        onPressed: () => Get.to(() => const FolderPickerScreen()),
-        tooltip: 'Music folders',
+        icon: Icon(_gridLayout ? Icons.view_list : Icons.grid_view,
+            color: _gridLayout ? kBrandOrange : kFg2, size: 22),
+        tooltip: 'Toggle layout',
+        onPressed: () => setState(() => _gridLayout = !_gridLayout),
       ),
       Obx(() {
         final scanning = LibraryController.inst.isScanning.value;
@@ -116,9 +111,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         );
       }),
       IconButton(
-        icon: Icon(_sortAsc ? Icons.sort : Icons.sort, color: kFg2, size: 22),
-        tooltip: 'Sort',
-        onPressed: () => _showSortSheet(),
+        icon: const Icon(Icons.more_vert, color: kFg2, size: 22),
+        onPressed: () => _showLibraryMenu(),
       ),
     ]);
   }
@@ -538,11 +532,22 @@ class _LibraryScreenState extends State<LibraryScreen>
         ),
         ListTile(
           leading: const Icon(Icons.folder_special, color: kBrandOrange),
-          title: const Text('Choose music folders', style: TextStyle(color: kFg1)),
+          title: const Text('Music folders', style: TextStyle(color: kFg1)),
           onTap: () { Get.back(); Get.to(() => const FolderPickerScreen()); },
+        ),
+        ListTile(
+          leading: const Icon(Icons.sort, color: kFg2),
+          title: const Text('Sort', style: TextStyle(color: kFg1)),
+          onTap: () { Get.back(); _showSortSheet(); },
+        ),
+        ListTile(
+          leading: const Icon(Icons.bar_chart, color: kFg2),
+          title: const Text('Library analytics', style: TextStyle(color: kFg1)),
+          onTap: () { Get.back(); Get.to(() => const AnalyticsScreen()); },
         ),
         const SizedBox(height: 16),
       ]),
     );
   }
 }
+

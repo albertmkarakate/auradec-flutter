@@ -32,7 +32,11 @@ class AnalyticsScreen extends StatelessWidget {
         for (final t in tracks) codecs[t.codec] = (codecs[t.codec] ?? 0) + 1;
 
         return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), children: [
-          const Text('Analytics', style: TextStyle(color: kFg1, fontSize: 22, fontWeight: FontWeight.w800, fontFamily: 'Syne')),
+          Row(children: [
+            IconButton(icon: const Icon(Icons.arrow_back, color: kFg2), onPressed: () => Get.back(), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+            const SizedBox(width: 8),
+            const Text('Analytics', style: TextStyle(color: kFg1, fontSize: 22, fontWeight: FontWeight.w800)),
+          ]),
           const SizedBox(height: 4),
           const Text('How your library gets listened to.', style: TextStyle(color: kFg2, fontSize: 12)),
           const SizedBox(height: 16),

@@ -9,6 +9,7 @@ import 'controllers/player_controller.dart';
 import 'controllers/theme_controller.dart';
 import 'services/audio_handler.dart';
 import 'ui/shell.dart';
+import 'ui/widgets/auradec_mark.dart';
 import 'core/constants.dart';
 
 void main() async {
@@ -121,16 +122,18 @@ class _SplashScreen extends StatelessWidget {
           ),
         )),
         Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          // Logo mark
-          Container(
-            width: 84, height: 84,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: kBrandOrange,
-              boxShadow: [BoxShadow(color: kBrandOrange.withAlpha(80), blurRadius: 40, spreadRadius: 4)],
+          // Logo mark — faithful replica of the SVG AuradecMark
+          Stack(alignment: Alignment.center, children: [
+            Container(
+              width: 100, height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: kBrandOrange.withAlpha(20),
+                boxShadow: [BoxShadow(color: kBrandOrange.withAlpha(50), blurRadius: 60, spreadRadius: 10)],
+              ),
             ),
-            child: const Icon(Icons.headphones, color: Colors.white, size: 42),
-          ),
+            const AuradecMark(size: 84),
+          ]),
           const SizedBox(height: 24),
           // Wordmark
           RichText(text: TextSpan(children: [
