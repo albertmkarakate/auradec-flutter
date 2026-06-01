@@ -141,6 +141,7 @@ class _SearchScreenState extends State<SearchScreen> {
             return ListTile(
               leading: AlbumArt(
                 artUri: trks.isNotEmpty ? trks.first.artUri : null,
+                filePath: trks.isNotEmpty ? trks.first.filePath : null,
                 seed: pl.name, size: 48, radius: 8,
               ),
               title: Text(pl.name, style: const TextStyle(color: kFg1, fontSize: 14)),
@@ -164,7 +165,7 @@ class _SearchScreenState extends State<SearchScreen> {
           ...albums.take(3).map((name) {
             final trks = lib.albums[name]!;
             return ListTile(
-              leading: AlbumArt(artUri: trks.first.artUri, seed: name, size: 48, radius: 8),
+              leading: AlbumArt(artUri: trks.first.artUri, filePath: trks.first.filePath, seed: name, size: 48, radius: 8),
               title: Text(name, style: const TextStyle(color: kFg1, fontSize: 14)),
               subtitle: Text(trks.first.artist, style: const TextStyle(color: kFg2, fontSize: 11)),
               onTap: () => Get.to(() => AlbumDetailScreen(albumName: name, tracks: trks)),

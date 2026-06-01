@@ -74,8 +74,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           style: const TextStyle(color: kFg3, fontSize: 9, letterSpacing: 3, fontFamily: 'Barlow')),
         if (track != null && !_showLyrics && !_showQueue)
           Text(track.codec == 'LIVE'
-            ? 'INTERNET RADIO · ${track.bitrate}kbps'
-            : '${track.codec} · ${track.bitrate}k',
+            ? (track.bitrate > 0 ? 'INTERNET RADIO · ${track.bitrate}kbps' : 'INTERNET RADIO')
+            : (track.bitrate > 0 ? '${track.codec} · ${track.bitrate}k' : track.codec),
             style: TextStyle(
               color: track.codec == 'LIVE' ? kBrandCoral : kBrandOrange,
               fontSize: 9, letterSpacing: 1)),
@@ -138,14 +138,18 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         if ((track?.artist ?? '').isNotEmpty)
           GestureDetector(
             onTap: () {
-              if (track == null) return;
+              if (track == null || track.codec == 'LIVE') return;
               Get.to(() => ArtistDetailScreen(artistName: track.artist));
             },
             child: Text(track!.artist,
-              style: const TextStyle(color: kFg2, fontSize: 14),
+              style: TextStyle(
+                color: kFg2,
+                fontSize: 14,
+                decoration: track.codec != 'LIVE' ? TextDecoration.none : TextDecoration.none,
+              ),
               maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
-        if ((track?.album ?? '').isNotEmpty) ...[
+        if ((track?.album ?? '').isNotEmpty && track?.codec != 'LIVE') ...[
           const SizedBox(height: 2),
           GestureDetector(
             onTap: () {
@@ -362,7 +366,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         return ListTile(
           key: ValueKey(t.path + i.toString()),
           leading: Stack(children: [
-            AlbumArt(artUri: t.artUri, seed: t.title, size: 42, radius: 8),
+            AlbumArt(artUri: t.artUri, filePath: t.filePath, seed: t.title, size: 42, radius: 8),
             if (isCurrent) Positioned.fill(child: Container(
               decoration: BoxDecoration(color: kBrandOrange.withAlpha(120), borderRadius: BorderRadius.circular(8)),
               child: const Icon(Icons.volume_up, color: Colors.white, size: 18),

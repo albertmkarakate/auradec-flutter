@@ -180,9 +180,11 @@ class _FolderPickerScreenState extends State<FolderPickerScreen> {
         return InkWell(
           onTap: () => _toggle(f.path),
           child: Container(
-            color: on ? kBrandOrange.withAlpha(12) : Colors.transparent,
             padding: EdgeInsets.fromLTRB(16 + indent, 12, 16, 12),
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: kBorder.withAlpha(60)))),
+            decoration: BoxDecoration(
+              color: on ? kBrandOrange.withAlpha(12) : Colors.transparent,
+              border: Border(bottom: BorderSide(color: kBorder.withAlpha(60))),
+            ),
             child: Row(children: [
               // Checkbox
               AnimatedContainer(

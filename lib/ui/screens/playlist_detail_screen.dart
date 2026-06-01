@@ -37,7 +37,7 @@ class PlaylistDetailScreen extends StatelessWidget {
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(fit: StackFit.expand, children: [
                 tracks.isNotEmpty
-                    ? AlbumArt(artUri: tracks.first.artUri, seed: playlist.name, size: double.infinity, radius: 0)
+                    ? AlbumArt(artUri: tracks.first.artUri, filePath: tracks.first.filePath, seed: playlist.name, size: double.infinity, radius: 0)
                     : Container(color: kBg2),
                 Container(decoration: BoxDecoration(gradient: LinearGradient(
                   begin: Alignment.topCenter, end: Alignment.bottomCenter,

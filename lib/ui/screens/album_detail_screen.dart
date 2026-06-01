@@ -26,7 +26,7 @@ class AlbumDetailScreen extends StatelessWidget {
           backgroundColor: kBg0,
           flexibleSpace: FlexibleSpaceBar(
             background: Stack(fit: StackFit.expand, children: [
-              AlbumArt(artUri: sorted.first.artUri, seed: albumName, size: double.infinity, radius: 0),
+              AlbumArt(artUri: sorted.first.artUri, filePath: sorted.first.filePath, seed: albumName, size: double.infinity, radius: 0),
               Container(decoration: BoxDecoration(gradient: LinearGradient(
                 begin: Alignment.topCenter, end: Alignment.bottomCenter,
                 colors: [Colors.transparent, kBg0.withAlpha(230), kBg0],

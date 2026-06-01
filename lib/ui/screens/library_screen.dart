@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants.dart';
+import '../../core/track.dart';
 import '../../controllers/library_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../widgets/track_tile.dart';
@@ -283,11 +284,10 @@ class _LibraryScreenState extends State<LibraryScreen>
     });
   }
 
-  Widget _albumCard(String name, List<dynamic> tracks) {
-    final tList = tracks.cast<dynamic>();
-    final artUri = tList.isNotEmpty ? (tList.first as dynamic).artUri as String? : null;
+  Widget _albumCard(String name, List<Track> tList) {
+    final first  = tList.isNotEmpty ? tList.first : null;
     return GestureDetector(
-      onTap: () => Get.to(() => AlbumDetailScreen(albumName: name, tracks: List.from(tList))),
+      onTap: () => Get.to(() => AlbumDetailScreen(albumName: name, tracks: tList)),
       child: Container(
         decoration: BoxDecoration(
           color: kBg1, borderRadius: BorderRadius.circular(16),
@@ -296,13 +296,13 @@ class _LibraryScreenState extends State<LibraryScreen>
         child: Column(children: [
           Expanded(child: ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-            child: AlbumArt(artUri: artUri, seed: name, size: double.infinity, radius: 0),
+            child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: name, size: double.infinity, radius: 0),
           )),
           Padding(
             padding: const EdgeInsets.all(10),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(name, style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text('${tracks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
+              Text('${tList.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
             ]),
           ),
         ]),
@@ -364,7 +364,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   return ListTile(
                     leading: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: AlbumArt(artUri: artUri, seed: pl.name, size: 48, radius: 8),
+                      child: AlbumArt(artUri: artUri, filePath: trks.isNotEmpty ? trks.first.filePath : null, seed: pl.name, size: 48, radius: 8),
                     ),
                     title: Text(pl.name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w600)),
                     subtitle: Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),

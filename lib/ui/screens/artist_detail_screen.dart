@@ -63,6 +63,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: kBrandOrange.withAlpha(100), width: 2)),
                     child: ClipOval(child: AlbumArt(
                       artUri: tracks.isNotEmpty ? tracks.first.artUri : null,
+                      filePath: tracks.isNotEmpty ? tracks.first.filePath : null,
                       seed: widget.artistName, size: 80, radius: 40,
                     )),
                   ),
@@ -113,7 +114,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                     onTap: () => Get.to(() => AlbumDetailScreen(albumName: name, tracks: trks)),
                     child: Container(width: 110, margin: const EdgeInsets.only(right: 10),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        AlbumArt(artUri: trks.first.artUri, seed: name, size: 110, radius: 10),
+                        AlbumArt(artUri: trks.first.artUri, filePath: trks.first.filePath, seed: name, size: 110, radius: 10),
                         const SizedBox(height: 5),
                         Text(name, style: const TextStyle(color: kFg1, fontSize: 11, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ]),
