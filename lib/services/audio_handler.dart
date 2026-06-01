@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:rxdart/rxdart.dart';
@@ -18,6 +19,10 @@ class AuradecAudioHandler {
   late final AudioPlayer _player;
   bool _initialized = false;
   bool _eqInitialized = false;
+
+  // Settings toggles
+  final gaplessEnabled      = false.obs;
+  final skipSilenceEnabled  = false.obs;
 
   // Reactive state (GetX-friendly observables via RxDart)
   final _currentTrack   = BehaviorSubject<Track?>.seeded(null);
@@ -250,6 +255,19 @@ class AuradecAudioHandler {
     } catch (_) {
       return [-1200, 1200];
     }
+  }
+
+  // ── Playback settings ─────────────────────────────────────────────
+
+  Future<void> setGapless(bool enabled) async {
+    gaplessEnabled.value = enabled;
+    // just_audio gapless: use silence removal for local files
+    try { await _player.setSkipSilenceEnabled(false); } catch (_) {}
+  }
+
+  Future<void> setSkipSilence(bool enabled) async {
+    skipSilenceEnabled.value = enabled;
+    try { await _player.setSkipSilenceEnabled(enabled); } catch (_) {}
   }
 
   void dispose() {

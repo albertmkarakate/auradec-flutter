@@ -25,6 +25,7 @@ class SettingsScreen extends StatelessWidget {
         ]),
         _section('Playback', [
           _playbackTile(),
+          _playbackToggles(),
         ]),
         _scrobbleSection(context),
         _section('Library & Storage', [
@@ -172,6 +173,51 @@ class SettingsScreen extends StatelessWidget {
           ]),
         );
       },
+    );
+  }
+
+  Widget _playbackToggles() {
+    return Obx(() {
+      final h = AuradecAudioHandler.inst;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(children: [
+          _switchRow(
+            icon: Icons.skip_next_outlined,
+            title: 'Gapless playback',
+            subtitle: 'No silence between tracks',
+            value: h.gaplessEnabled.value,
+            onChanged: (v) => h.setGapless(v),
+          ),
+          _switchRow(
+            icon: Icons.speed,
+            title: 'Skip silence',
+            subtitle: 'Jump over quiet passages',
+            value: h.skipSilenceEnabled.value,
+            onChanged: (v) => h.setSkipSilence(v),
+          ),
+        ]),
+      );
+    });
+  }
+
+  Widget _switchRow({required IconData icon, required String title, required String subtitle, required bool value, required ValueChanged<bool> onChanged}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(children: [
+        Icon(icon, color: kBrandOrange, size: 20),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w500)),
+          Text(subtitle, style: const TextStyle(color: kFg2, fontSize: 11)),
+        ])),
+        Switch(
+          value: value,
+          onChanged: onChanged,
+          activeColor: kBrandOrange,
+          inactiveTrackColor: kBorder,
+        ),
+      ]),
     );
   }
 
