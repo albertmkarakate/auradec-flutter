@@ -23,20 +23,23 @@ class MediaStoreService {
     if (raw == null) return [];
     return raw.map((e) {
       final m = Map<String, dynamic>.from(e as Map);
+      final codec = m['codec'] as String;
       return Track(
         path:        m['path']        as String,
+        filePath:    m['filePath']    as String? ?? '',
         title:       m['title']       as String,
         artist:      m['artist']      as String,
-        albumArtist: m['albumArtist'] as String,
+        albumArtist: m['albumArtist'] as String? ?? '',
         album:       m['album']       as String,
         year:        m['year']        as int,
         trackNo:     m['trackNo']     as int,
+        discNo:      m['discNo']      as int? ?? 1,
         durationMs:  (m['durationMs'] as num).toInt(),
         bitrate:     m['bitrate']     as int,
         sampleRate:  m['sampleRate']  as int,
         fileSize:    (m['fileSize']   as num).toInt(),
-        codec:       m['codec']       as String,
-        isLossless:  (m['codec'] as String).toUpperCase() == 'FLAC' || (m['codec'] as String).toUpperCase() == 'WAV',
+        codec:       codec,
+        isLossless:  codec.toUpperCase() == 'FLAC' || codec.toUpperCase() == 'WAV',
       )..artUri = m['artUri'] as String?;
     }).toList();
   }

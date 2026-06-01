@@ -43,10 +43,10 @@ class TrackTile extends StatelessWidget {
             ))
           else if (!isPlaying) ...[
             // Album art
-            AlbumArt(artUri: track.artUri, seed: track.title, size: 46, radius: 10),
+            AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: 46, radius: 10),
             const SizedBox(width: 2),
           ] else ...[
-            AlbumArt(artUri: track.artUri, seed: track.title, size: 46, radius: 10),
+            AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: 46, radius: 10),
             const SizedBox(width: 2),
           ],
           const SizedBox(width: 10),
@@ -127,7 +127,7 @@ class _TrackMenu extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(children: [
-              AlbumArt(artUri: track.artUri, seed: track.title, size: 52, radius: 10),
+              AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: 52, radius: 10),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(track.title, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w600),

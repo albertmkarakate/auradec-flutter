@@ -108,7 +108,7 @@ class AuradecAudioHandler {
     _currentTrack.add(track);
 
     // Resolve content:// art to a cached file:// URI for MediaSession/lock screen
-    final artFileUri = await _resolveArtUri(track.artUri);
+    final artFileUri = await _resolveArtUri(track.artUri, track.filePath);
 
     final source = AudioSource.uri(
       Uri.parse(track.path),
@@ -129,22 +129,22 @@ class AuradecAudioHandler {
 
   /// Converts a content:// album art URI to a cached file:// URI.
   /// just_audio_background needs a file:// or http:// URI for lock-screen art.
-  Future<Uri?> _resolveArtUri(String? contentUri) async {
-    if (contentUri == null || contentUri.isEmpty) return null;
-    if (_artCache.containsKey(contentUri)) return _artCache[contentUri];
+  Future<Uri?> _resolveArtUri(String? contentUri, String filePath) async {
+    final key = '${contentUri ?? ""}|$filePath';
+    if (_artCache.containsKey(key)) return _artCache[key];
     try {
-      final bytes = await _mediaStoreChannel
-          .invokeMethod<Uint8List>('getArtwork', {'uri': contentUri});
-      if (bytes == null || bytes.isEmpty) { _artCache[contentUri] = null; return null; }
-      final dir   = await getTemporaryDirectory();
-      final hash  = contentUri.hashCode.abs();
-      final file  = File('${dir.path}/auradec_art_$hash.jpg');
+      final bytes = await _mediaStoreChannel.invokeMethod<Uint8List>(
+          'getArtwork', {'uri': contentUri ?? '', 'filePath': filePath});
+      if (bytes == null || bytes.isEmpty) { _artCache[key] = null; return null; }
+      final dir  = await getTemporaryDirectory();
+      final hash = key.hashCode.abs();
+      final file = File('${dir.path}/auradec_art_$hash.jpg');
       if (!await file.exists()) await file.writeAsBytes(bytes);
       final uri = file.uri;
-      _artCache[contentUri] = uri;
+      _artCache[key] = uri;
       return uri;
     } catch (_) {
-      _artCache[contentUri] = null;
+      _artCache[key] = null;
       return null;
     }
   }

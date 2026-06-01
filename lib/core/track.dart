@@ -1,6 +1,7 @@
 /// Core track model — mirrors Namida's TrackExtended fields.
 class Track {
-  final String path;         // canonical file path or content URI
+  final String path;         // content:// URI for ExoPlayer
+  final String filePath;    // absolute /storage/... path for metadata/art
   final String title;
   final String artist;
   final String albumArtist;
@@ -26,6 +27,7 @@ class Track {
 
   Track({
     required this.path,
+    this.filePath = '',
     required this.title,
     required this.artist,
     this.albumArtist = '',
@@ -60,7 +62,7 @@ class Track {
   Duration get duration => Duration(milliseconds: durationMs);
 
   Map<String, dynamic> toJson() => {
-    'path': path, 'title': title, 'artist': artist, 'albumArtist': albumArtist,
+    'path': path, 'filePath': filePath, 'title': title, 'artist': artist, 'albumArtist': albumArtist,
     'album': album, 'genre': genre, 'year': year, 'trackNo': trackNo, 'discNo': discNo,
     'durationMs': durationMs, 'bitrate': bitrate, 'sampleRate': sampleRate,
     'fileSize': fileSize, 'codec': codec, 'isLossless': isLossless, 'comment': comment,
@@ -68,7 +70,7 @@ class Track {
   };
 
   factory Track.fromJson(Map<String, dynamic> j) => Track(
-    path: j['path'] ?? '', title: j['title'] ?? 'Unknown',
+    path: j['path'] ?? '', filePath: j['filePath'] ?? '', title: j['title'] ?? 'Unknown',
     artist: j['artist'] ?? 'Unknown Artist', albumArtist: j['albumArtist'] ?? '',
     album: j['album'] ?? 'Unknown Album', genre: j['genre'] ?? '',
     year: j['year'] ?? 0, trackNo: j['trackNo'] ?? 0, discNo: j['discNo'] ?? 0,

@@ -29,7 +29,7 @@ class MiniPlayer extends StatelessWidget {
           child: Row(children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: AlbumArt(artUri: track.artUri, seed: track.title, size: 40, radius: 10),
+              child: AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: 40, radius: 10),
             ),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

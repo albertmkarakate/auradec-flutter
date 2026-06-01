@@ -44,7 +44,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
             if (track != null && !_showQueue)
               Positioned.fill(child: ImageFiltered(
                 imageFilter: ImageFilter.blur(sigmaX: 48, sigmaY: 48),
-                child: AlbumArt(artUri: track.artUri, seed: track.title, size: double.infinity, radius: 0),
+                child: AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: double.infinity, radius: 0),
               )),
             // Dark gradient overlay
             Positioned.fill(child: Container(
@@ -104,7 +104,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
-                    child: AlbumArt(artUri: track?.artUri, seed: track?.title ?? '', size: double.infinity, radius: 0),
+                    child: AlbumArt(artUri: track?.artUri, filePath: track?.filePath, seed: track?.title ?? '', size: double.infinity, radius: 0),
                   ),
                 )),
               ),
