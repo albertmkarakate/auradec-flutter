@@ -428,30 +428,34 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
   void _showSleepTimer() {
     showModalBottomSheet(context: context, backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _SleepTimerSheet(),
+      builder: (_) => SafeArea(child: SingleChildScrollView(child: _SleepTimerSheet())),
     );
   }
 
   void _showRateSheet(Track track) {
     showModalBottomSheet(context: context, backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _RateSheet(track: track),
+      builder: (_) => SafeArea(child: SingleChildScrollView(child: _RateSheet(track: track))),
     );
   }
 
   void _showVolumeSheet(AuradecAudioHandler h) {
     showModalBottomSheet(context: context, backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _VolumeSheet(handler: h),
+      builder: (_) => SafeArea(child: SingleChildScrollView(child: _VolumeSheet(handler: h))),
     );
   }
 
   void _showTrackMenu(Track? track) {
     if (track == null) return;
     showModalBottomSheet(context: context, backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Column(mainAxisSize: MainAxisSize.min, children: [
+      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
         const SizedBox(height: 8),
         ListTile(leading: const Icon(Icons.info_outline, color: kFg2), title: const Text('Track info', style: TextStyle(color: kFg1)),
           subtitle: Text('${track.codec} · ${track.bitrate}kbps · ${track.sampleRate}Hz', style: const TextStyle(color: kFg3, fontSize: 11))),
@@ -459,7 +463,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         ListTile(leading: const Icon(Icons.block, color: kBrandCoral), title: const Text('Exclude from library', style: TextStyle(color: kBrandCoral)),
           onTap: () { LibraryController.inst.excludeTrack(track.path); Get.back(); Get.back(); }),
         const SizedBox(height: 8),
-      ]),
+      ])),
     );
   }
 

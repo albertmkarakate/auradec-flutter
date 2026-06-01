@@ -153,11 +153,12 @@ class SettingsScreen extends StatelessWidget {
     const descs = ['More tracks visible', 'Balanced (default)', 'Larger touch targets'];
     showModalBottomSheet(
       context: Get.context!, backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Obx(() {
+      builder: (_) => SafeArea(child: Obx(() {
         final tc = ThemeController.inst;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('Density', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
@@ -172,7 +173,7 @@ class SettingsScreen extends StatelessWidget {
             )),
           ]),
         );
-      }),
+      })),
     );
   }
 
@@ -284,10 +285,10 @@ class SettingsScreen extends StatelessWidget {
       context: context, backgroundColor: kBg1,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Obx(() {
+      builder: (_) => SafeArea(child: Obx(() {
         final tc = ThemeController.inst;
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        return SingleChildScrollView(child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Color scheme', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
@@ -328,8 +329,8 @@ class SettingsScreen extends StatelessWidget {
               );
             }).toList()),
           ]),
-        );
-      }),
+        ));
+      })),
     );
   }
 
@@ -562,8 +563,8 @@ class _EQSheetStandaloneState extends State<_EQSheetStandalone> {
   @override
   Widget build(BuildContext context) {
     final h = AuradecAudioHandler.inst;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+    return SafeArea(child: Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('Equaliser', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
@@ -606,6 +607,6 @@ class _EQSheetStandaloneState extends State<_EQSheetStandalone> {
           ]))),
         )),
       ]),
-    );
+    ));
   }
 }

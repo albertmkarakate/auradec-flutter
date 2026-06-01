@@ -114,8 +114,9 @@ class TrackTile extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _TrackMenu(track: track),
+      builder: (_) => SafeArea(child: SingleChildScrollView(child: _TrackMenu(track: track))),
     );
   }
 }
@@ -196,8 +197,9 @@ class _TrackMenu extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Obx(() => Column(mainAxisSize: MainAxisSize.min, children: [
+      builder: (_) => SafeArea(child: Obx(() => SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Padding(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text('Add to playlist', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
@@ -208,8 +210,8 @@ class _TrackMenu extends StatelessWidget {
           subtitle: Text('${lib.playlistTracks(pl).length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
           onTap: () { lib.addToPlaylist(pl.id, track.path); Get.back(); },
         )),
-        const SizedBox(height: 16),
-      ])),
+        const SizedBox(height: 8),
+      ])))),
     );
   }
 
@@ -217,9 +219,10 @@ class _TrackMenu extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      builder: (_) => SafeArea(child: SingleChildScrollView(child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(track.title, style: const TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
@@ -242,7 +245,7 @@ class _TrackMenu extends StatelessWidget {
             ]),
           )),
         ]),
-      ),
+      ))),
     );
   }
 

@@ -139,9 +139,11 @@ class _LibraryScreenState extends State<LibraryScreen>
 
     showModalBottomSheet(
       context: context, backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => StatefulBuilder(builder: (ctx, setS) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      builder: (_) => StatefulBuilder(builder: (ctx, setS) => SafeArea(
+        child: SingleChildScrollView(child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
             Text('Sort ${isAlbums ? "albums" : isArtists ? "artists" : "tracks"}',
@@ -176,7 +178,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             );
           }),
         ]),
-      )),
+      )))),
     );
   }
 
@@ -638,8 +640,9 @@ class _LibraryScreenState extends State<LibraryScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: kBg1,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Column(mainAxisSize: MainAxisSize.min, children: [
+      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
         ListTile(
           leading: const Icon(Icons.search, color: kBrandOrange),
           title: const Text('Scan device', style: TextStyle(color: kFg1)),
@@ -660,8 +663,8 @@ class _LibraryScreenState extends State<LibraryScreen>
           title: const Text('Library analytics', style: TextStyle(color: kFg1)),
           onTap: () { Get.back(); Get.to(() => const AnalyticsScreen()); },
         ),
-        const SizedBox(height: 16),
-      ]),
+        const SizedBox(height: 8),
+      ])),
     );
   }
 }
