@@ -122,7 +122,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
       }),
     )),
     _trackInfo(track, h),
-    _progressBar(h),
+    if (track?.codec == 'LIVE') _liveBar() else _progressBar(h),
     _transportControls(h),
     const SizedBox(height: 8),
   ]);
@@ -175,6 +175,38 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         );
       }),
     ]),
+  );
+
+  Widget _liveBar() => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+    child: Builder(builder: (ctx) {
+      final accent = Theme.of(ctx).colorScheme.primary;
+      return Row(children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: kBrandCoral.withAlpha(25),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: kBrandCoral.withAlpha(80)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 6, height: 6, decoration: const BoxDecoration(color: kBrandCoral, shape: BoxShape.circle)),
+            const SizedBox(width: 5),
+            const Text('LIVE', style: TextStyle(color: kBrandCoral, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.5)),
+          ]),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: StreamBuilder<bool>(
+          stream: AuradecAudioHandler.inst.isPlaying,
+          builder: (_, s) {
+            final playing = s.data ?? false;
+            return playing
+                ? LinearProgressIndicator(color: accent, backgroundColor: kBorder, minHeight: 2)
+                : Container(height: 2, color: kBorder);
+          },
+        )),
+      ]);
+    }),
   );
 
   Widget _progressBar(AuradecAudioHandler h) => Padding(

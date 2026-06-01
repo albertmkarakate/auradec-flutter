@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../../core/constants.dart';
 import '../../core/track.dart';
 import '../../controllers/library_controller.dart';
+import '../../controllers/theme_controller.dart';
+import '../../services/audio_handler.dart';
 import '../widgets/album_art.dart';
 
 class TrackTile extends StatelessWidget {
@@ -26,15 +28,24 @@ class TrackTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       onLongPress: () => _showMenu(context),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Obx(() {
+        final pad = ThemeController.inst.listItemPadding;
+        final art = ThemeController.inst.artSize;
+        return _buildRow(context, pad, art);
+      }),
+    );
+  }
+
+  Widget _buildRow(BuildContext context, double pad, double artSz) {
+    return Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: pad),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: kBorder.withAlpha(80))),
           color: isPlaying ? kBrandOrange.withAlpha(20) : Colors.transparent,
         ),
         child: Row(children: [
           if (isPlaying)
-            Container(width: 3, height: 46, color: kBrandOrange, margin: const EdgeInsets.only(right: 8)),
+            Container(width: 3, height: artSz, color: kBrandOrange, margin: const EdgeInsets.only(right: 8)),
           if (showNumber && !isPlaying)
             SizedBox(width: 24, child: Text(
               track.trackNo > 0 ? '${track.trackNo}' : '·',
@@ -43,10 +54,10 @@ class TrackTile extends StatelessWidget {
             ))
           else if (!isPlaying) ...[
             // Album art
-            AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: 46, radius: 10),
+            AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: artSz, radius: 10),
             const SizedBox(width: 2),
           ] else ...[
-            AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: 46, radius: 10),
+            AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: artSz, radius: 10),
             const SizedBox(width: 2),
           ],
           const SizedBox(width: 10),
@@ -81,7 +92,6 @@ class TrackTile extends StatelessWidget {
               onPressed: () => _showMenu(context),
             ),
         ]),
-      ),
     );
   }
 
@@ -149,7 +159,20 @@ class _TrackMenu extends StatelessWidget {
               Get.back();
               _showPlaylistPicker(context, lib);
             }),
-          _item(Icons.queue_music, 'Add to queue', () => Get.back()),
+          _item(Icons.queue_music, 'Add to queue', () {
+            AuradecAudioHandler.inst.addToQueue(track);
+            Get.back();
+            Get.snackbar('', '',
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: kBg2, colorText: kFg1,
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 80),
+              duration: const Duration(seconds: 2), borderRadius: 12,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              messageText: Text('Added to queue: ${track.title}',
+                  style: const TextStyle(color: kFg1, fontSize: 13)),
+              titleText: const SizedBox.shrink(),
+            );
+          }),
           _item(Icons.info_outline, 'Track info', () {
             Get.back();
             _showInfo(context);

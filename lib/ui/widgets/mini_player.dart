@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../services/audio_handler.dart';
 import '../../controllers/player_controller.dart';
+import '../../controllers/library_controller.dart';
 import '../widgets/album_art.dart';
 
 class MiniPlayer extends StatelessWidget {
@@ -15,7 +16,13 @@ class MiniPlayer extends StatelessWidget {
       builder: (ctx, snap) {
         final track = snap.data;
         if (track == null) return const SizedBox.shrink();
-        return Container(
+        return GestureDetector(
+          onHorizontalDragEnd: (d) {
+            final v = d.primaryVelocity ?? 0;
+            if (v < -400)       PlayerController.inst.next();
+            else if (v > 400)   PlayerController.inst.prev();
+          },
+          child: Container(
           margin: const EdgeInsets.fromLTRB(8, 0, 8, 6),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
@@ -68,7 +75,8 @@ class MiniPlayer extends StatelessWidget {
               },
             ),
           ]),
-        );
+        ), // Container
+        ); // GestureDetector
       },
     );
   }

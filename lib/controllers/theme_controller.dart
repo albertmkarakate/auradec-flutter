@@ -36,6 +36,11 @@ class ThemeController extends GetxController {
   final secondary = Rx<Color?>(null);
   final schemeId  = 'void'.obs;
 
+  // Density: 0=Compact, 1=Comfy (default), 2=Loose
+  final density = 1.obs;
+  double get listItemPadding => [6.0, 11.0, 16.0][density.value.clamp(0, 2)];
+  double get artSize         => [38.0, 46.0, 54.0][density.value.clamp(0, 2)];
+
   @override
   void onInit() {
     super.onInit();
@@ -77,6 +82,12 @@ class ThemeController extends GetxController {
     );
   }
 
+  Future<void> setDensity(int d) async {
+    density.value = d.clamp(0, 2);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('auradec_density', d);
+  }
+
   Future<void> setScheme(String id) async {
     final s = kSchemes.firstWhereOrNull((x) => x.id == id);
     if (s == null) return;
@@ -101,6 +112,9 @@ class ThemeController extends GetxController {
         return;
       }
     }
+    final d = prefs.getInt('auradec_density');
+    if (d != null) density.value = d.clamp(0, 2);
+
     // Fallback: raw stored colors
     final a = prefs.getInt(_kPrefAccent);
     final sec = prefs.getInt(_kPrefSecondary);

@@ -425,13 +425,17 @@ class _LibraryScreenState extends State<LibraryScreen>
         itemBuilder: (ctx, i) {
           final name = keys[i];
           final trks = artists[name]!;
+          final first = trks.isNotEmpty ? trks.first : null;
           return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: kBrandOrange.withAlpha(30),
-              child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: const TextStyle(color: kBrandOrange, fontWeight: FontWeight.w700)),
+            leading: ClipOval(
+              child: AlbumArt(
+                artUri: first?.artUri,
+                filePath: first?.filePath,
+                seed: name,
+                size: 46, radius: 23,
+              ),
             ),
-            title: Text(name, style: const TextStyle(color: kFg1, fontSize: 14)),
+            title: Text(name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w500)),
             subtitle: Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
             trailing: const Icon(Icons.chevron_right, color: kFg3),
             onTap: () => Get.to(() => ArtistDetailScreen(artistName: name)),

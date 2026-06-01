@@ -25,9 +25,12 @@ class SettingsScreen extends StatelessWidget {
         // ── PERSONALISE ───────────────────────────────────────────
         _groupLabel('Personalise', kBrandOrange),
         _groupCard([
-          _navTile(Icons.palette_outlined, 'Appearance',
-              'Theme · colour scheme · density', kBrandOrange,
+          _navTile(Icons.palette_outlined, 'Colour scheme',
+              'Accent colour · multi-colour themes', kBrandOrange,
               onTap: () => _showSchemeSheet(context)),
+          _navTile(Icons.density_medium, 'Density',
+              'Compact · Comfy · Loose list spacing', kBrandOrange,
+              onTap: () => _showDensitySheet()),
         ]),
 
         // ── SOUND ─────────────────────────────────────────────────
@@ -142,6 +145,34 @@ class SettingsScreen extends StatelessWidget {
               : const SizedBox.shrink()),
         ]),
       ),
+    );
+  }
+
+  void _showDensitySheet() {
+    const opts = ['Compact', 'Comfy', 'Loose'];
+    const descs = ['More tracks visible', 'Balanced (default)', 'Larger touch targets'];
+    showModalBottomSheet(
+      context: Get.context!, backgroundColor: kBg1,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Obx(() {
+        final tc = ThemeController.inst;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Density', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            ...List.generate(3, (i) => ListTile(
+              title: Text(opts[i], style: TextStyle(
+                  color: tc.density.value == i ? kBrandOrange : kFg1,
+                  fontWeight: tc.density.value == i ? FontWeight.w700 : FontWeight.normal)),
+              subtitle: Text(descs[i], style: const TextStyle(color: kFg2, fontSize: 11)),
+              trailing: tc.density.value == i
+                  ? const Icon(Icons.check, color: kBrandOrange, size: 18) : null,
+              onTap: () { tc.setDensity(i); Get.back(); },
+            )),
+          ]),
+        );
+      }),
     );
   }
 

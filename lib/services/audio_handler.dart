@@ -207,6 +207,23 @@ class AuradecAudioHandler {
 
   // ── Queue ─────────────────────────────────────────────────────────
 
+  void addToQueue(Track track) {
+    _queue.add(track);
+  }
+
+  void addAllToQueue(List<Track> tracks) {
+    _queue.addAll(tracks);
+  }
+
+  void clearQueue() {
+    final current = _queue.isNotEmpty ? _queue[_queueIndex] : null;
+    _queue.clear();
+    if (current != null) {
+      _queue.add(current);
+      _queueIndex = 0;
+    }
+  }
+
   void reorderQueue(List<Track> newOrder) {
     final currentPath = _queue.isNotEmpty ? _queue[_queueIndex].path : null;
     _queue..clear()..addAll(newOrder);
