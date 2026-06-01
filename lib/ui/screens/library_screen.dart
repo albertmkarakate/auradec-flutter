@@ -13,6 +13,7 @@ import 'now_playing_screen.dart';
 import 'album_detail_screen.dart';
 import 'artist_detail_screen.dart';
 import 'playlist_detail_screen.dart';
+import '../../services/audio_handler.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -492,6 +493,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 style: const TextStyle(color: kFg2, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
               trailing: const Icon(Icons.chevron_right, color: kFg3),
               onTap: () => Get.to(() => AlbumDetailScreen(albumName: name, tracks: trks)),
+              onLongPress: () => _showAlbumMenu(name, trks),
             );
           },
         );
@@ -517,6 +519,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     final first  = tList.isNotEmpty ? tList.first : null;
     return GestureDetector(
       onTap: () => Get.to(() => AlbumDetailScreen(albumName: name, tracks: tList)),
+      onLongPress: () => _showAlbumMenu(name, tList),
       child: Container(
         decoration: BoxDecoration(
           color: kBg1, borderRadius: BorderRadius.circular(16),
@@ -567,6 +570,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             final first = trks.isNotEmpty ? trks.first : null;
             return GestureDetector(
               onTap: () => Get.to(() => ArtistDetailScreen(artistName: name)),
+              onLongPress: () => _showArtistMenu(name),
               child: Column(children: [
                 Expanded(child: ClipOval(child: AlbumArt(
                   artUri: first?.artUri, filePath: first?.filePath,
@@ -600,6 +604,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             subtitle: Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
             trailing: const Icon(Icons.chevron_right, color: kFg3),
             onTap: () => Get.to(() => ArtistDetailScreen(artistName: name)),
+            onLongPress: () => _showArtistMenu(name),
           );
         },
       );
@@ -864,5 +869,115 @@ class _LibraryScreenState extends State<LibraryScreen>
       ])),
     );
   }
+
+  // ── Context menus ────────────────────────────────────────────────────────
+
+  void _showArtistMenu(String name) {
+    final lib  = LibraryController.inst;
+    final trks = lib.artists[name] ?? [];
+    showModalBottomSheet(
+      context: context, backgroundColor: kBg1,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+          child: Row(children: [
+            CircleAvatar(radius: 24, backgroundColor: kBrandOrange.withAlpha(30),
+                child: Text(name.isNotEmpty ? name[0] : '?',
+                    style: const TextStyle(color: kBrandOrange, fontSize: 18, fontWeight: FontWeight.w700))),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w700),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
+            ])),
+          ]),
+        ),
+        const Divider(color: kBorder, height: 1),
+        _mItem(Icons.play_arrow, 'Play all', () {
+          if (trks.isEmpty) return;
+          PlayerController.inst.playTrack(trks.first, queue: trks);
+          Get.back();
+          Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+        }),
+        _mItem(Icons.shuffle, 'Shuffle artist', () {
+          if (trks.isEmpty) return;
+          final q = trks.toList()..shuffle();
+          PlayerController.inst.playTrack(q.first, queue: q);
+          Get.back();
+          Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+        }),
+        _mItem(Icons.queue_music, 'Add all to queue', () {
+          for (final t in trks) AuradecAudioHandler.inst.addToQueue(t);
+          Get.back();
+        }),
+        _mItem(Icons.radio, 'Start artist radio', () { Get.back(); }),
+        _mItem(Icons.info_outline, 'Artist info & bio', () {
+          Get.back();
+          Get.to(() => ArtistDetailScreen(artistName: name));
+        }),
+        const SizedBox(height: 8),
+      ])),
+    );
+  }
+
+  void _showAlbumMenu(String name, List<Track> trks) {
+    final first = trks.isNotEmpty ? trks.first : null;
+    showModalBottomSheet(
+      context: context, backgroundColor: kBg1,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+          child: Row(children: [
+            ClipRRect(borderRadius: BorderRadius.circular(8),
+                child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath,
+                    seed: name, size: 52, radius: 8)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w700),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text('${first?.artist ?? ''} · ${trks.length} tracks',
+                  style: const TextStyle(color: kFg2, fontSize: 11)),
+            ])),
+          ]),
+        ),
+        const Divider(color: kBorder, height: 1),
+        _mItem(Icons.play_arrow, 'Play album', () {
+          if (trks.isEmpty) return;
+          PlayerController.inst.playTrack(trks.first, queue: trks);
+          Get.back();
+          Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+        }),
+        _mItem(Icons.shuffle, 'Shuffle album', () {
+          final q = trks.toList()..shuffle();
+          if (q.isEmpty) return;
+          PlayerController.inst.playTrack(q.first, queue: q);
+          Get.back();
+          Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+        }),
+        _mItem(Icons.queue_music, 'Add to queue', () {
+          for (final t in trks) AuradecAudioHandler.inst.addToQueue(t);
+          Get.back();
+        }),
+        if (first != null)
+          _mItem(Icons.mic_none, 'Go to artist', () {
+            Get.back();
+            Get.to(() => ArtistDetailScreen(artistName: first.artist));
+          }),
+        _mItem(Icons.info_outline, 'Album info & credits', () {
+          Get.back();
+          Get.to(() => AlbumDetailScreen(albumName: name, tracks: trks));
+        }),
+        const SizedBox(height: 8),
+      ])),
+    );
+  }
+
+  Widget _mItem(IconData icon, String label, VoidCallback onTap) => ListTile(
+    leading: Icon(icon, color: kFg2, size: 20),
+    title: Text(label, style: const TextStyle(color: kFg1, fontSize: 14)),
+    onTap: onTap, dense: true, minLeadingWidth: 20,
+  );
 }
 
