@@ -1,7 +1,10 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 import '../core/track.dart';
 
@@ -14,7 +17,11 @@ class AuradecAudioHandler {
   static final AuradecAudioHandler inst = AuradecAudioHandler._();
   AuradecAudioHandler._();
 
-  static const _eqChannel = MethodChannel('app.auradec/equalizer');
+  static const _eqChannel         = MethodChannel('app.auradec/equalizer');
+  static const _mediaStoreChannel = MethodChannel('app.auradec/media_store');
+
+  // Art cache: content:// URI → file:// URI (avoids repeated disk writes)
+  final _artCache = <String, Uri?>{};
 
   late final AudioPlayer _player;
   bool _initialized = false;
@@ -100,6 +107,9 @@ class AuradecAudioHandler {
   Future<void> loadTrack(Track track, {bool autoPlay = true}) async {
     _currentTrack.add(track);
 
+    // Resolve content:// art to a cached file:// URI for MediaSession/lock screen
+    final artFileUri = await _resolveArtUri(track.artUri);
+
     final source = AudioSource.uri(
       Uri.parse(track.path),
       tag: MediaItem(
@@ -107,14 +117,36 @@ class AuradecAudioHandler {
         title:    track.title,
         artist:   track.artist,
         album:    track.album,
-        artUri:   track.artUri != null ? Uri.tryParse(track.artUri!) : null,
+        artUri:   artFileUri,
         duration: track.durationMs > 0 ? track.duration : null,
       ),
     );
 
     await _player.setAudioSource(source);
-    _initEQ(); // non-blocking, fire-and-forget
+    _initEQ();
     if (autoPlay) await _player.play();
+  }
+
+  /// Converts a content:// album art URI to a cached file:// URI.
+  /// just_audio_background needs a file:// or http:// URI for lock-screen art.
+  Future<Uri?> _resolveArtUri(String? contentUri) async {
+    if (contentUri == null || contentUri.isEmpty) return null;
+    if (_artCache.containsKey(contentUri)) return _artCache[contentUri];
+    try {
+      final bytes = await _mediaStoreChannel
+          .invokeMethod<Uint8List>('getArtwork', {'uri': contentUri});
+      if (bytes == null || bytes.isEmpty) { _artCache[contentUri] = null; return null; }
+      final dir   = await getTemporaryDirectory();
+      final hash  = contentUri.hashCode.abs();
+      final file  = File('${dir.path}/auradec_art_$hash.jpg');
+      if (!await file.exists()) await file.writeAsBytes(bytes);
+      final uri = file.uri;
+      _artCache[contentUri] = uri;
+      return uri;
+    } catch (_) {
+      _artCache[contentUri] = null;
+      return null;
+    }
   }
 
   /// Load a live internet radio stream. Creates a synthetic Track so the
@@ -174,6 +206,15 @@ class AuradecAudioHandler {
   }
 
   // ── Queue ─────────────────────────────────────────────────────────
+
+  void reorderQueue(List<Track> newOrder) {
+    final currentPath = _queue.isNotEmpty ? _queue[_queueIndex].path : null;
+    _queue..clear()..addAll(newOrder);
+    if (currentPath != null) {
+      final idx = _queue.indexWhere((t) => t.path == currentPath);
+      if (idx >= 0) _queueIndex = idx;
+    }
+  }
 
   Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true}) async {
     _queue

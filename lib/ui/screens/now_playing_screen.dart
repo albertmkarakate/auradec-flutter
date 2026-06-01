@@ -340,18 +340,27 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
   Widget _queueView() {
     final h = AuradecAudioHandler.inst;
-    final queue = h.queue;
+    final queue = List.from(h.queue); // mutable copy
     if (queue.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       const Icon(Icons.queue_music, color: kFg3, size: 40),
       const SizedBox(height: 10),
       const Text('Queue is empty', style: TextStyle(color: kFg2, fontSize: 14)),
     ]));
-    return ListView.builder(
+    return ReorderableListView.builder(
+      onReorder: (oldIdx, newIdx) {
+        // ReorderableListView adjusts newIdx for you
+        final updated = List.from(h.queue);
+        if (newIdx > oldIdx) newIdx--;
+        final item = updated.removeAt(oldIdx);
+        updated.insert(newIdx, item);
+        h.reorderQueue(List.from(updated));
+      },
       itemCount: queue.length,
       itemBuilder: (ctx, i) {
         final t = queue[i];
         final isCurrent = i == h.queueIndex;
         return ListTile(
+          key: ValueKey(t.path + i.toString()),
           leading: Stack(children: [
             AlbumArt(artUri: t.artUri, seed: t.title, size: 42, radius: 8),
             if (isCurrent) Positioned.fill(child: Container(
@@ -361,8 +370,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           ]),
           title: Text(t.title, style: TextStyle(color: isCurrent ? kBrandOrange : kFg1, fontSize: 13, fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal), maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: Text(t.artist, style: const TextStyle(color: kFg2, fontSize: 11)),
-          trailing: Text(_fmtMs(t.durationMs), style: const TextStyle(color: kFg3, fontSize: 10)),
-          onTap: () => PlayerController.inst.playTrack(t, queue: queue, queueIndex: i),
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(_fmtMs(t.durationMs), style: const TextStyle(color: kFg3, fontSize: 10)),
+            const SizedBox(width: 8),
+            const Icon(Icons.drag_handle, color: kFg3, size: 18),
+          ]),
+          onTap: () => PlayerController.inst.playTrack(t, queue: List.from(h.queue), queueIndex: i),
         );
       },
     );

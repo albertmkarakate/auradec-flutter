@@ -17,12 +17,16 @@ class LibraryScreen extends StatefulWidget {
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
+enum _SortMode { title, artist, album, dateAdded, duration }
+
 class _LibraryScreenState extends State<LibraryScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   final _search = TextEditingController();
   String _query = '';
   String _activeTab = 'tracks';
+  _SortMode _sortMode = _SortMode.title;
+  bool _sortAsc = true;
 
   @override
   void initState() {
@@ -111,10 +115,52 @@ class _LibraryScreenState extends State<LibraryScreen>
         );
       }),
       IconButton(
-        icon: const Icon(Icons.more_vert, color: kFg2, size: 22),
-        onPressed: () => _showLibraryMenu(),
+        icon: Icon(_sortAsc ? Icons.sort : Icons.sort, color: kFg2, size: 22),
+        tooltip: 'Sort',
+        onPressed: () => _showSortSheet(),
       ),
     ]);
+  }
+
+  void _showSortSheet() {
+    showModalBottomSheet(
+      context: context, backgroundColor: kBg1,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => StatefulBuilder(builder: (ctx, setS) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            const Text('Sort by', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
+            const Spacer(),
+            GestureDetector(
+              onTap: () { setState(() => _sortAsc = !_sortAsc); setS(() {}); },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: kBg2, borderRadius: BorderRadius.circular(8), border: Border.all(color: kBorder)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward, color: kBrandOrange, size: 14),
+                  const SizedBox(width: 4),
+                  Text(_sortAsc ? 'A–Z' : 'Z–A', style: const TextStyle(color: kFg1, fontSize: 12)),
+                ]),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          ..._SortMode.values.map((m) {
+            final labels = {_SortMode.title: 'Title', _SortMode.artist: 'Artist', _SortMode.album: 'Album', _SortMode.dateAdded: 'Date added', _SortMode.duration: 'Duration'};
+            final icons  = {_SortMode.title: Icons.sort_by_alpha, _SortMode.artist: Icons.mic, _SortMode.album: Icons.album, _SortMode.dateAdded: Icons.calendar_today, _SortMode.duration: Icons.timer_outlined};
+            final active = _sortMode == m;
+            return ListTile(
+              leading: Icon(icons[m], color: active ? kBrandOrange : kFg2, size: 20),
+              title: Text(labels[m]!, style: TextStyle(color: active ? kBrandOrange : kFg1, fontWeight: active ? FontWeight.w700 : FontWeight.normal)),
+              trailing: active ? const Icon(Icons.check, color: kBrandOrange, size: 18) : null,
+              onTap: () { setState(() => _sortMode = m); setS(() {}); },
+              dense: true,
+            );
+          }),
+        ]),
+      )),
+    );
   }
 
   Widget _searchBar() {
@@ -184,9 +230,23 @@ class _LibraryScreenState extends State<LibraryScreen>
         return _emptyState();
       }
 
-      final filtered = _query.isEmpty ? all.toList()
+      var filtered = _query.isEmpty ? all.toList()
           : all.where((t) => '${t.title} ${t.artist} ${t.album} ${t.genre}'
               .toLowerCase().contains(_query.toLowerCase())).toList();
+
+      // Apply sort
+      int cmp(a, b) {
+        int r;
+        switch (_sortMode) {
+          case _SortMode.artist:   r = a.artist.compareTo(b.artist); break;
+          case _SortMode.album:    r = a.album.compareTo(b.album); break;
+          case _SortMode.dateAdded: r = a.lastPlayed.compareTo(b.lastPlayed); break;
+          case _SortMode.duration: r = a.durationMs.compareTo(b.durationMs); break;
+          default:                 r = a.title.compareTo(b.title);
+        }
+        return _sortAsc ? r : -r;
+      }
+      filtered.sort(cmp);
 
       return ListView.builder(
         padding: const EdgeInsets.only(bottom: 8),
