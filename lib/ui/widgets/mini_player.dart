@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../core/constants.dart';
 import '../../services/audio_handler.dart';
 import '../../controllers/player_controller.dart';
-import '../../controllers/library_controller.dart';
 import '../widgets/album_art.dart';
 
 class MiniPlayer extends StatelessWidget {

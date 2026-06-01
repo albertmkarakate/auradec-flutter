@@ -124,7 +124,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     _trackInfo(track, h),
     if (track?.codec == 'LIVE') _liveBar() else _progressBar(h),
     _transportControls(h),
-    const SizedBox(height: 8),
+    _ratingRow(h),
+    const SizedBox(height: 4),
   ]);
 
   Widget _trackInfo(Track? track, AuradecAudioHandler h) => Padding(
@@ -139,13 +140,17 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           GestureDetector(
             onTap: () {
               if (track == null || track.codec == 'LIVE') return;
-              Get.to(() => ArtistDetailScreen(artistName: track.artist));
+              final primary = track.artist
+                  .split(RegExp(r'\s+(feat\.|ft\.|&|,)\s+', caseSensitive: false))
+                  .first.trim();
+              Get.to(() => ArtistDetailScreen(artistName: primary));
             },
             child: Text(track!.artist,
               style: TextStyle(
-                color: kFg2,
+                color: track.codec != 'LIVE' ? kBrandOrange : kFg2,
                 fontSize: 14,
-                decoration: track.codec != 'LIVE' ? TextDecoration.none : TextDecoration.none,
+                decoration: track.codec != 'LIVE' ? TextDecoration.underline : TextDecoration.none,
+                decorationColor: kBrandOrange.withAlpha(120),
               ),
               maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
@@ -161,9 +166,17 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
               }
             },
             child: Text(track!.album,
-              style: const TextStyle(color: kFg3, fontSize: 11),
+              style: const TextStyle(
+                color: kFg3, fontSize: 11,
+                decoration: TextDecoration.underline,
+                decorationColor: Color(0x44FFFFFE),
+              ),
               maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
+        ],
+        if (track != null && track.codec != 'LIVE') ...[
+          const SizedBox(height: 12),
+          _metaBand(track),
         ],
       ])),
       StreamBuilder<Track?>(stream: h.currentTrack, builder: (_, s) {
@@ -176,6 +189,46 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
       }),
     ]),
   );
+
+  Widget _metaBand(Track track) {
+    final cells = <List<String>>[
+      if (track.genre.isNotEmpty) ['GENRE', track.genre],
+      ['CODEC', track.codec],
+      if (track.bitrate > 0) ['KBPS', '${track.bitrate}'],
+      if (track.sampleRate > 0) ['kHz', '${(track.sampleRate / 1000).toStringAsFixed(1)}'],
+      if (track.plays > 0) ['PLAYS', '${track.plays}'],
+    ];
+    if (cells.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: kBg1.withAlpha(120),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kBorder),
+      ),
+      child: Row(
+        children: List.generate(cells.length, (i) {
+          final isCodec = cells[i][0] == 'CODEC';
+          return Expanded(child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(right: i < cells.length - 1
+                  ? BorderSide(color: kBorder)
+                  : BorderSide.none)),
+            child: Column(children: [
+              Text(cells[i][0],
+                  style: const TextStyle(color: kFg3, fontSize: 7, letterSpacing: 1.5, fontFamily: 'Barlow')),
+              const SizedBox(height: 2),
+              Text(cells[i][1], style: TextStyle(
+                  color: isCodec ? kBrandOrange : kFg1,
+                  fontSize: 10, fontWeight: FontWeight.w600, fontFamily: 'Barlow'),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ]),
+          ));
+        }),
+      ),
+    );
+  }
 
   Widget _liveBar() => Padding(
     padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
@@ -209,23 +262,57 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     }),
   );
 
-  Widget _progressBar(AuradecAudioHandler h) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-    child: Builder(builder: (ctx) {
-      final accent = Theme.of(ctx).colorScheme.primary;
-      return StreamBuilder<int>(stream: h.positionMs, builder: (_, posSnap) =>
-        StreamBuilder<int>(stream: h.durationMs, builder: (_, durSnap) {
+  Widget _progressBar(AuradecAudioHandler h) => StreamBuilder<Track?>(
+    stream: h.currentTrack,
+    builder: (_, trackSnap) => StreamBuilder<int>(
+      stream: h.positionMs,
+      builder: (_, posSnap) => StreamBuilder<int>(
+        stream: h.durationMs,
+        builder: (ctx, durSnap) {
           final pos = posSnap.data ?? 0;
-          final dur = durSnap.data ?? 0;
-          return ProgressBar(
-            progress: Duration(milliseconds: pos), total: Duration(milliseconds: dur > 0 ? dur : 1),
-            progressBarColor: accent, thumbColor: accent, baseBarColor: kBorder,
-            timeLabelTextStyle: const TextStyle(color: kFg2, fontSize: 10),
-            onSeek: (d) => h.seekTo(d),
+          final dur = durSnap.data ?? 1;
+          final progress = dur > 0 ? (pos / dur).clamp(0.0, 1.0) : 0.0;
+          final accent = Theme.of(ctx).colorScheme.primary;
+          final seed = trackSnap.data?.title ?? '';
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+            child: Column(children: [
+              // Waveform
+              GestureDetector(
+                onTapDown: (d) {
+                  final box = context.findRenderObject() as RenderBox?;
+                  if (box == null) return;
+                  final local = box.globalToLocal(d.globalPosition);
+                  final barWidth = box.size.width - 40;
+                  final ratio = ((local.dx - 20) / barWidth).clamp(0.0, 1.0);
+                  h.seekTo(Duration(milliseconds: (ratio * dur).round()));
+                },
+                child: SizedBox(
+                  height: 40,
+                  child: CustomPaint(
+                    size: const Size(double.infinity, 40),
+                    painter: _WaveformPainter(
+                      seed: seed,
+                      progress: progress,
+                      playedColor: accent,
+                      unplayedColor: kBorder.withAlpha(200),
+                    ),
+                  ),
+                ),
+              ),
+              // Time labels
+              Row(children: [
+                Text(_fmtMs(pos), style: const TextStyle(color: kFg2, fontSize: 10, fontFamily: 'Barlow')),
+                const Spacer(),
+                Text('-${_fmtMs((dur - pos).clamp(0, dur))}',
+                    style: const TextStyle(color: kFg2, fontSize: 10, fontFamily: 'Barlow')),
+              ]),
+            ]),
           );
-        }),
-      );
-    }),
+        },
+      ),
+    ),
   );
 
   Widget _transportControls(AuradecAudioHandler h) => Padding(
@@ -257,6 +344,39 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
         }),
       ]);
     }),
+  );
+
+  Widget _ratingRow(AuradecAudioHandler h) => StreamBuilder<Track?>(
+    stream: h.currentTrack,
+    builder: (_, snap) {
+      final track = snap.data;
+      if (track == null) return const SizedBox.shrink();
+      final stars = (track.rating / 20).round().clamp(0, 5);
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          // Star rating
+          ...List.generate(5, (i) => GestureDetector(
+            onTap: () => LibraryController.inst.setRating(track.path, (i + 1) * 20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Icon(
+                i < stars ? Icons.star : Icons.star_border,
+                color: i < stars ? const Color(0xFFFBBF24) : kFg3,
+                size: 18,
+              ),
+            ),
+          )),
+          if (track.plays > 0) ...[
+            const SizedBox(width: 16),
+            Text(
+              '${track.plays} ${track.plays == 1 ? 'play' : 'plays'}',
+              style: const TextStyle(color: kFg3, fontSize: 10, letterSpacing: 0.5, fontFamily: 'Barlow'),
+            ),
+          ],
+        ]),
+      );
+    },
   );
 
   Widget _extraBar(AuradecAudioHandler h, Track? track) => Container(
@@ -468,6 +588,66 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   }
 
   String _fmtMs(int ms) { final m = ms ~/ 60000; final s = (ms % 60000) ~/ 1000; return '$m:${s.toString().padLeft(2,'0')}'; }
+}
+
+// ── Waveform painter ─────────────────────────────────────────────────
+
+class _WaveformPainter extends CustomPainter {
+  final String seed;
+  final double progress; // 0.0–1.0
+  final Color playedColor;
+  final Color unplayedColor;
+
+  const _WaveformPainter({
+    required this.seed,
+    required this.progress,
+    required this.playedColor,
+    required this.unplayedColor,
+  });
+
+  // Deterministic bar heights from string seed (matches JS reference)
+  static List<double> _bars(String seed) {
+    int h = 0;
+    for (int i = 0; i < seed.length; i++) h = (h * 31 + seed.codeUnitAt(i)) & 0x7fffffff;
+    final bars = <double>[];
+    for (int i = 0; i < 80; i++) {
+      h = (h * 1103515245 + 12345) & 0x7fffffff;
+      final base = 0.25 + (h % 1000) / 1000.0 * 0.75;
+      final env  = 0.55 + 0.45 * _sin(i / 80.0);
+      bars.add((base * env).clamp(0.08, 1.0));
+    }
+    return bars;
+  }
+
+  static double _sin(double x) {
+    // Approximate sin(x*π) without dart:math import
+    final t = x * 3.14159265;
+    // Taylor: sin(t) ≈ t - t³/6 + t⁵/120 (accurate enough for 0..π)
+    return t - (t * t * t) / 6 + (t * t * t * t * t) / 120;
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bars = _bars(seed);
+    final n = bars.length;
+    const gap = 1.5;
+    final barW = (size.width - gap * (n - 1)) / n;
+    final playedPaint  = Paint()..color = playedColor;
+    final unplayedPaint = Paint()..color = unplayedColor;
+
+    for (int i = 0; i < n; i++) {
+      final x    = i * (barW + gap);
+      final h    = bars[i] * size.height;
+      final y    = (size.height - h) / 2;
+      final rect = Rect.fromLTWH(x, y, barW.clamp(1.0, 8.0), h);
+      final rr   = RRect.fromRectAndRadius(rect, const Radius.circular(1));
+      canvas.drawRRect(rr, i / n <= progress ? playedPaint : unplayedPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_WaveformPainter old) =>
+      old.progress != progress || old.seed != seed || old.playedColor != playedColor;
 }
 
 // ── EQ Sheet ─────────────────────────────────────────────────────────

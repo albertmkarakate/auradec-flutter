@@ -30,15 +30,22 @@ class _LibraryScreenState extends State<LibraryScreen>
   String _activeTab = 'tracks';
   _SortMode _sortMode = _SortMode.title;
   bool _sortAsc = true;
-  bool _gridLayout = true; // grid for albums, list for tracks
+  // Per-tab grid/list state — tracks & loved always list
+  final _gridLayout = <String, bool>{
+    'tracks': false, 'albums': true, 'artists': true, 'playlists': true, 'loved': false,
+  };
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 5, vsync: this);
     _tabs.addListener(() {
+      if (!_tabs.indexIsChanging) return;
       final labels = ['tracks', 'albums', 'artists', 'playlists', 'loved'];
-      setState(() => _activeTab = labels[_tabs.index]);
+      setState(() {
+        _activeTab = labels[_tabs.index];
+        _sortMode  = _SortMode.title;
+      });
     });
   }
 
@@ -86,20 +93,65 @@ class _LibraryScreenState extends State<LibraryScreen>
         const SizedBox(height: 10),
         _searchBar(),
         const SizedBox(height: 8),
+        _statsBar(),
+        const SizedBox(height: 6),
       ]),
     );
   }
 
+  Widget _statsBar() {
+    return Obx(() {
+      final lib = LibraryController.inst;
+      if (lib.tracks.isEmpty) return const SizedBox.shrink();
+      final totalMs  = lib.tracks.fold(0, (s, t) => s + t.durationMs);
+      final totalH   = totalMs ~/ 3600000;
+      final totalM   = (totalMs % 3600000) ~/ 60000;
+      final durLabel = totalH > 0 ? '${totalH}h ${totalM}m' : '${totalM}m';
+      final stats = [
+        ['TRACKS',   '${lib.tracks.length}'],
+        ['ARTISTS',  '${lib.artists.length}'],
+        ['ALBUMS',   '${lib.albums.length}'],
+        ['DURATION', durLabel],
+      ];
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: List.generate(stats.length, (i) => Container(
+            margin: EdgeInsets.only(right: i < stats.length - 1 ? 8 : 0),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: kBg1,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: kBorder),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(stats[i][0], style: const TextStyle(
+                  color: kFg3, fontSize: 8, letterSpacing: 1.5, fontFamily: 'Barlow')),
+              const SizedBox(width: 6),
+              Text(stats[i][1], style: const TextStyle(
+                  color: kFg1, fontSize: 13, fontWeight: FontWeight.w800, fontFamily: 'Syne')),
+            ]),
+          )),
+        ),
+      );
+    });
+  }
+
+
   Widget _logomark() => const AuradecMark(size: 32);
 
   Widget _toolbarActions() {
+    final hasToggle = _activeTab == 'albums' || _activeTab == 'artists' || _activeTab == 'playlists';
+    final grid = _gridLayout[_activeTab] ?? false;
     return Row(children: [
-      IconButton(
-        icon: Icon(_gridLayout ? Icons.view_list : Icons.grid_view,
-            color: _gridLayout ? kBrandOrange : kFg2, size: 22),
-        tooltip: 'Toggle layout',
-        onPressed: () => setState(() => _gridLayout = !_gridLayout),
-      ),
+      if (hasToggle)
+        IconButton(
+          icon: Icon(grid ? Icons.view_list : Icons.grid_view,
+              color: grid ? kBrandOrange : kFg2, size: 22),
+          tooltip: 'Toggle layout',
+          onPressed: () => setState(() => _gridLayout[_activeTab] = !grid),
+        ),
       Obx(() {
         final scanning = LibraryController.inst.isScanning.value;
         return IconButton(
@@ -267,7 +319,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       }
       filtered.sort(cmp);
 
-      if (!_gridLayout) {
+      if (!(_gridLayout['tracks'] ?? false)) {
         // Compact list: smaller art, condensed padding
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 8),
@@ -341,7 +393,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           keys.sort((a, b) => _sortAsc ? a.compareTo(b) : b.compareTo(a));
       }
 
-      if (!_gridLayout) {
+      if (!(_gridLayout['albums'] ?? true)) {
         // List view
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 8),
@@ -413,7 +465,6 @@ class _LibraryScreenState extends State<LibraryScreen>
       final artists = LibraryController.inst.artists;
       var keys = artists.keys.toList();
       if (keys.isEmpty) return const SizedBox();
-      // Sort artists
       if (_sortMode == _SortMode.duration) {
         keys.sort((a, b) {
           final r = (artists[a]?.length ?? 0).compareTo(artists[b]?.length ?? 0);
@@ -422,21 +473,50 @@ class _LibraryScreenState extends State<LibraryScreen>
       } else {
         keys.sort((a, b) => _sortAsc ? a.compareTo(b) : b.compareTo(a));
       }
+
+      if (_gridLayout['artists'] ?? true) {
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3, childAspectRatio: 0.82,
+            crossAxisSpacing: 10, mainAxisSpacing: 14,
+          ),
+          itemCount: keys.length,
+          itemBuilder: (ctx, i) {
+            final name = keys[i];
+            final trks = artists[name]!;
+            final first = trks.isNotEmpty ? trks.first : null;
+            return GestureDetector(
+              onTap: () => Get.to(() => ArtistDetailScreen(artistName: name)),
+              child: Column(children: [
+                Expanded(child: ClipOval(child: AlbumArt(
+                  artUri: first?.artUri, filePath: first?.filePath,
+                  seed: name, size: double.infinity, radius: 999,
+                ))),
+                const SizedBox(height: 5),
+                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: kFg1, fontSize: 11, fontWeight: FontWeight.w600)),
+                Text('${trks.length} tracks',
+                  style: const TextStyle(color: kFg2, fontSize: 9)),
+              ]),
+            );
+          },
+        );
+      }
+
       return ListView.builder(
+        padding: const EdgeInsets.only(bottom: 80),
         itemCount: keys.length,
         itemBuilder: (ctx, i) {
           final name = keys[i];
           final trks = artists[name]!;
           final first = trks.isNotEmpty ? trks.first : null;
           return ListTile(
-            leading: ClipOval(
-              child: AlbumArt(
-                artUri: first?.artUri,
-                filePath: first?.filePath,
-                seed: name,
-                size: 46, radius: 23,
-              ),
-            ),
+            leading: ClipOval(child: AlbumArt(
+              artUri: first?.artUri, filePath: first?.filePath,
+              seed: name, size: 46, radius: 23,
+            )),
             title: Text(name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w500)),
             subtitle: Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
             trailing: const Icon(Icons.chevron_right, color: kFg3),
@@ -452,6 +532,8 @@ class _LibraryScreenState extends State<LibraryScreen>
       final lib = LibraryController.inst;
       final pls = lib.playlists;
 
+      final useGrid = _gridLayout['playlists'] ?? true;
+
       return Stack(children: [
         pls.isEmpty
             ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -465,25 +547,61 @@ class _LibraryScreenState extends State<LibraryScreen>
                   onPressed: () => _createPlaylist(),
                 ),
               ]))
-            : ListView.builder(
-                padding: const EdgeInsets.only(bottom: 80),
-                itemCount: pls.length,
-                itemBuilder: (ctx, i) {
-                  final pl = pls[i];
-                  final trks = lib.playlistTracks(pl);
-                  final artUri = trks.isNotEmpty ? trks.first.artUri : null;
-                  return ListTile(
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: AlbumArt(artUri: artUri, filePath: trks.isNotEmpty ? trks.first.filePath : null, seed: pl.name, size: 48, radius: 8),
-                    ),
-                    title: Text(pl.name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w600)),
-                    subtitle: Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
-                    trailing: const Icon(Icons.chevron_right, color: kFg3),
-                    onTap: () => Get.to(() => PlaylistDetailScreen(playlist: pl)),
-                  );
-                },
-              ),
+            : useGrid
+              ? GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2, childAspectRatio: 0.82,
+                    crossAxisSpacing: 12, mainAxisSpacing: 12,
+                  ),
+                  itemCount: pls.length,
+                  itemBuilder: (ctx, i) {
+                    final pl = pls[i];
+                    final trks = lib.playlistTracks(pl);
+                    final first = trks.isNotEmpty ? trks.first : null;
+                    return GestureDetector(
+                      onTap: () => Get.to(() => PlaylistDetailScreen(playlist: pl)),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: kBg1, borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: kBorder),
+                        ),
+                        child: Column(children: [
+                          Expanded(child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                            child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: pl.name, size: double.infinity, radius: 0),
+                          )),
+                          Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(pl.name, style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
+                            ]),
+                          ),
+                        ]),
+                      ),
+                    );
+                  },
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 80),
+                  itemCount: pls.length,
+                  itemBuilder: (ctx, i) {
+                    final pl = pls[i];
+                    final trks = lib.playlistTracks(pl);
+                    final first = trks.isNotEmpty ? trks.first : null;
+                    return ListTile(
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: pl.name, size: 48, radius: 8),
+                      ),
+                      title: Text(pl.name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w600)),
+                      subtitle: Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
+                      trailing: const Icon(Icons.chevron_right, color: kFg3),
+                      onTap: () => Get.to(() => PlaylistDetailScreen(playlist: pl)),
+                    );
+                  },
+                ),
         Positioned(
           right: 16, bottom: 16,
           child: FloatingActionButton(

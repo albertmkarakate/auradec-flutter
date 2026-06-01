@@ -57,15 +57,19 @@ class IndexerService {
     final fromStore = results[0];
     final fromFs    = results[1];
 
-    // Merge: MediaStore is authoritative, FS fills gaps
+    // Merge: MediaStore is authoritative, FS fills gaps.
+    // Deduplicate by PHYSICAL file path — MediaStore uses content:// URIs
+    // so t.path never matches FS paths; use filePath (or path for FS tracks).
     final seen = <String>{};
     final merged = <Track>[];
 
+    String _key(Track t) => t.filePath.isNotEmpty ? t.filePath : t.path;
+
     for (final t in fromStore) {
-      if (seen.add(t.path)) merged.add(t);
+      if (seen.add(_key(t))) merged.add(t);
     }
     for (final t in fromFs) {
-      if (seen.add(t.path)) merged.add(t);
+      if (seen.add(_key(t))) merged.add(t);
     }
 
     // Sort by title
@@ -227,7 +231,12 @@ Future<List<Track>> _extractChunk(List<String> paths) async {
       final name  = path.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '');
       final parts = name.split(' - ');
       final title  = parts.length >= 2 ? parts.skip(1).join(' - ').trim() : name;
-      final artist = parts.length >= 2 ? parts.first.trim() : 'Unknown Artist';
+      final rawArtist = parts.length >= 2 ? parts.first.trim() : '';
+      // Reject track-number prefixes like "01", "01.", "Track 01"
+      final artist = (rawArtist.isNotEmpty &&
+              !RegExp(r'^(track\s*)?\d{1,3}\.?$', caseSensitive: false).hasMatch(rawArtist))
+          ? rawArtist
+          : 'Unknown Artist';
       final ext    = path.split('.').last.toUpperCase();
 
       const lossless = {'FLAC', 'ALAC', 'WAV', 'APE', 'AIFF'};

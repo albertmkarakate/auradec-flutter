@@ -32,7 +32,7 @@ class _LfmSheetState extends State<LfmSheet> {
   @override
   Widget build(BuildContext context) {
     final svc = widget.svc;
-    return Padding(
+    return SafeArea(top: false, child: Padding(
       padding: EdgeInsets.fromLTRB(
           20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 24),
       child: Column(mainAxisSize: MainAxisSize.min,
@@ -85,7 +85,7 @@ class _LfmSheetState extends State<LfmSheet> {
           const Center(child: CircularProgressIndicator(color: kBrandOrange, strokeWidth: 2)),
         ],
       ]),
-    );
+    ));
   }
 
   Widget _inputField(TextEditingController c, String hint, {required bool obscure}) {
@@ -191,7 +191,7 @@ class _LbzSheetState extends State<LbzSheet> {
   @override
   Widget build(BuildContext context) {
     final svc = widget.svc;
-    return Padding(
+    return SafeArea(top: false, child: Padding(
       padding: EdgeInsets.fromLTRB(
           20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 24),
       child: Column(mainAxisSize: MainAxisSize.min,
@@ -265,7 +265,7 @@ class _LbzSheetState extends State<LbzSheet> {
               child: CircularProgressIndicator(color: kBrandOrange, strokeWidth: 2)),
         ],
       ]),
-    );
+    ));
   }
 
   Future<void> _onSave() async {

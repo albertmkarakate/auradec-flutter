@@ -10,10 +10,12 @@ const kBg1 = Color(0xFF0E0B13);
 const kBg2 = Color(0xFF17121F);
 
 const kFg1 = Color(0xFFECE5D8);
-const kFg2 = Color(0xFF9E8FA0);
-const kFg3 = Color(0xFF5C4F60);
-
-const kBorder = Color(0xFF2A1F30);
+// rgba(236,229,216,0.55) — warm muted text, matches design token --color-text-secondary
+const kFg2 = Color(0x8CECE5D8);
+// rgba(236,229,216,0.28) — placeholder / tertiary text, matches --color-text-tertiary
+const kFg3 = Color(0x47ECE5D8);
+// rgba(255,255,255,0.10) — subtle card border, matches --color-border-default
+const kBorder = Color(0x1AFFFFFF);
 
 /// Audio file extensions Namida-style
 const kAudioExtensions = {

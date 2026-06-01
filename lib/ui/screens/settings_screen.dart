@@ -25,9 +25,7 @@ class SettingsScreen extends StatelessWidget {
         // ── PERSONALISE ───────────────────────────────────────────
         _groupLabel('Personalise', kBrandOrange),
         _groupCard([
-          _navTile(Icons.palette_outlined, 'Colour scheme',
-              'Accent colour · multi-colour themes', kBrandOrange,
-              onTap: () => _showSchemeSheet(context)),
+          _colorSchemeTile(context),
           _navTile(Icons.density_medium, 'Density',
               'Compact · Comfy · Loose list spacing', kBrandOrange,
               onTap: () => _showDensitySheet()),
@@ -181,16 +179,19 @@ class SettingsScreen extends StatelessWidget {
     showModalBottomSheet(
       context: Get.context!, backgroundColor: kBg1, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => SingleChildScrollView(child: Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(Get.context!).viewInsets.bottom),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Text('Playback', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700))),
-          _playbackTile(),
-          _playbackToggles(),
-          const SizedBox(height: 24),
-        ]),
-      )),
+      builder: (ctx) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(child: Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text('Playback', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700))),
+            _playbackTile(),
+            _playbackToggles(),
+            const SizedBox(height: 24),
+          ]),
+        )),
+      ),
     );
   }
 
@@ -206,12 +207,15 @@ class SettingsScreen extends StatelessWidget {
     showModalBottomSheet(
       context: context, backgroundColor: kBg1, isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 4),
-          child: Text('Scrobbling', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700))),
-        _scrobbleSection(context),
-        const SizedBox(height: 24),
-      ])),
+      builder: (_) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(padding: EdgeInsets.fromLTRB(20, 16, 20, 4),
+            child: Text('Scrobbling', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700))),
+          _scrobbleSection(context),
+          const SizedBox(height: 24),
+        ])),
+      ),
     );
   }
 
