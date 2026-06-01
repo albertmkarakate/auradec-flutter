@@ -21,6 +21,8 @@ const kSchemes = [
   ThemeScheme('pulse',     'Pulse',      Color(0xFF29F89E)),
   ThemeScheme('coral',     'Coral',      Color(0xFFFF4D6A)),
   ThemeScheme('tide',      'Tide',       Color(0xFF60A5FA)),
+  ThemeScheme('dusk',      'Dusk',       Color(0xFFA78BFA)),
+  ThemeScheme('bloom',     'Bloom',      Color(0xFFFF7AC6)),
   ThemeScheme('inferno',   'Inferno',    Color(0xFFFF5C1A), Color(0xFFFF8000)),
   ThemeScheme('harvest',   'Harvest',    Color(0xFFFF5C1A), Color(0xFFF5B32A)),
   ThemeScheme('spark',     'Spark',      Color(0xFFFF5C1A), Color(0xFF29F89E)),

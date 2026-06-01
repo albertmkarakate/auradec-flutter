@@ -222,10 +222,10 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen>
 
       // Top tracks
       _sectionHead('Top Tracks'),
-      ...tracks.take(5).map((t) => TrackTile(
+      ...(([...tracks]..sort((a, b) => b.plays.compareTo(a.plays))).take(5).map((t) => TrackTile(
         track: t,
         onTap: () { PlayerController.inst.playTrack(t, queue: List.from(tracks)); Get.to(() => const NowPlayingScreen()); },
-      )),
+      ))),
     ]);
   }
 

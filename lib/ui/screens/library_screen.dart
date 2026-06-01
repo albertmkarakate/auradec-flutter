@@ -32,7 +32,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   bool _sortAsc = true;
   // Per-tab grid/list state — tracks & loved always list
   final _gridLayout = <String, bool>{
-    'tracks': false, 'albums': true, 'artists': true, 'playlists': true, 'loved': false,
+    'tracks': true, 'albums': true, 'artists': true, 'playlists': true, 'loved': false,
   };
 
   @override
@@ -142,7 +142,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   Widget _logomark() => const AuradecMark(size: 32);
 
   Widget _toolbarActions() {
-    final hasToggle = _activeTab == 'albums' || _activeTab == 'artists' || _activeTab == 'playlists';
+    final hasToggle = _activeTab != 'loved';
     final grid = _gridLayout[_activeTab] ?? false;
     return Row(children: [
       if (hasToggle)
@@ -319,47 +319,48 @@ class _LibraryScreenState extends State<LibraryScreen>
       }
       filtered.sort(cmp);
 
-      if (!(_gridLayout['tracks'] ?? false)) {
-        // Compact list: smaller art, condensed padding
+      if (_gridLayout['tracks'] ?? true) {
+        // Full TrackTile with album art (default)
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 8),
           itemCount: filtered.length,
-          itemBuilder: (ctx, i) {
-            final t = filtered[i];
-            return InkWell(
-              onTap: () {
-                PlayerController.inst.playTrack(t, queue: filtered);
-                Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                child: Row(children: [
-                  AlbumArt(artUri: t.artUri, filePath: t.filePath, seed: t.title, size: 36, radius: 7),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(t.title, style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w500),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text('${t.artist} · ${t.album}', style: const TextStyle(color: kFg2, fontSize: 11),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ])),
-                  Text(_fmtMs(t.durationMs), style: const TextStyle(color: kFg3, fontSize: 10)),
-                ]),
-              ),
-            );
-          },
+          itemBuilder: (ctx, i) => TrackTile(
+            track: filtered[i],
+            onTap: () {
+              PlayerController.inst.playTrack(filtered[i], queue: filtered);
+              Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+            },
+          ),
         );
       }
 
+      // Compact list: smaller art, condensed padding
       return ListView.builder(
         padding: const EdgeInsets.only(bottom: 8),
         itemCount: filtered.length,
-        itemBuilder: (ctx, i) => TrackTile(
-          track: filtered[i],
-          onTap: () {
-            PlayerController.inst.playTrack(filtered[i], queue: filtered);
-            Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
-          },
-        ),
+        itemBuilder: (ctx, i) {
+          final t = filtered[i];
+          return InkWell(
+            onTap: () {
+              PlayerController.inst.playTrack(t, queue: filtered);
+              Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              child: Row(children: [
+                AlbumArt(artUri: t.artUri, filePath: t.filePath, seed: t.title, size: 36, radius: 7),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(t.title, style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w500),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text('${t.artist} · ${t.album}', style: const TextStyle(color: kFg2, fontSize: 11),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ])),
+                Text(_fmtMs(t.durationMs), style: const TextStyle(color: kFg3, fontSize: 10)),
+              ]),
+            ),
+          );
+        },
       );
     });
   }

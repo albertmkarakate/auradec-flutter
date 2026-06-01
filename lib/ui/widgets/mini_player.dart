@@ -23,7 +23,6 @@ class MiniPlayer extends StatelessWidget {
           },
           child: Container(
           margin: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xF20E0B13),
             borderRadius: BorderRadius.circular(18),
@@ -32,7 +31,26 @@ class MiniPlayer extends StatelessWidget {
               BoxShadow(color: Colors.black38, blurRadius: 12, offset: Offset(0, 4)),
             ],
           ),
-          child: Row(children: [
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            // Thin progress bar at top
+            StreamBuilder<int>(stream: h.positionMs, builder: (_, posSnap) =>
+              StreamBuilder<int>(stream: h.durationMs, builder: (ctx, durSnap) {
+                final pos = posSnap.data ?? 0;
+                final dur = durSnap.data ?? 1;
+                final progress = dur > 0 ? (pos / dur).clamp(0.0, 1.0) : 0.0;
+                final accent = Theme.of(ctx).colorScheme.primary;
+                return ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                  child: LinearProgressIndicator(
+                    value: progress, minHeight: 2,
+                    color: accent, backgroundColor: Colors.transparent,
+                  ),
+                );
+              }),
+            ),
+            Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: AlbumArt(artUri: track.artUri, filePath: track.filePath, seed: track.title, size: 40, radius: 10),
@@ -74,6 +92,8 @@ class MiniPlayer extends StatelessWidget {
               },
             ),
           ]),
+            ), // Padding
+          ]), // Column
         ), // Container
         ); // GestureDetector
       },

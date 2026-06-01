@@ -206,7 +206,7 @@ class _TrackRow extends StatelessWidget {
                 style: const TextStyle(color: kFg2, fontSize: 11),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
           ])),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           // Codec badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
@@ -218,7 +218,14 @@ class _TrackRow extends StatelessWidget {
             child: Text(track.codec,
                 style: const TextStyle(color: kBrandOrange, fontSize: 8, fontFamily: 'Barlow')),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
+          // Stars
+          Row(mainAxisSize: MainAxisSize.min, children: List.generate(5, (i) {
+            final stars = (track.rating / 20).round().clamp(0, 5);
+            return Icon(i < stars ? Icons.star : Icons.star_border,
+                color: i < stars ? const Color(0xFFFBBF24) : kFg3, size: 9);
+          })),
+          const SizedBox(width: 8),
           // Duration
           Text(_fmt(track.durationMs),
               style: const TextStyle(color: kFg2, fontSize: 11, fontFamily: 'Barlow')),

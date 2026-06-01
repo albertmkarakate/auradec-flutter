@@ -23,6 +23,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   bool _showQueue  = false;
   LyricsResult? _lyrics;
   bool _lyricsLoading = false;
+  final _lyricsScroll = ScrollController();
+  int _lastLyricsIdx  = -1;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +88,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
 
   Widget _mainView(Track? track, AuradecAudioHandler h) => Column(children: [
     Expanded(child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
       child: Builder(builder: (ctx) {
         final accent = Theme.of(ctx).colorScheme.primary;
         final isLive = track?.codec == 'LIVE';
@@ -125,7 +127,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     if (track?.codec == 'LIVE') _liveBar() else _progressBar(h),
     _transportControls(h),
     _ratingRow(h),
-    const SizedBox(height: 4),
+    _similarRow(track),
   ]);
 
   Widget _trackInfo(Track? track, AuradecAudioHandler h) => Padding(
@@ -133,7 +135,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
     child: Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(track?.title ?? '—',
-          style: const TextStyle(color: kFg1, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+          style: const TextStyle(color: kFg1, fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5, fontFamily: 'Syne'),
           maxLines: 1, overflow: TextOverflow.ellipsis),
         const SizedBox(height: 4),
         if ((track?.artist ?? '').isNotEmpty)
@@ -278,29 +280,29 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
           return Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
             child: Column(children: [
-              // Waveform
-              GestureDetector(
-                onTapDown: (d) {
-                  final box = context.findRenderObject() as RenderBox?;
-                  if (box == null) return;
-                  final local = box.globalToLocal(d.globalPosition);
-                  final barWidth = box.size.width - 40;
-                  final ratio = ((local.dx - 20) / barWidth).clamp(0.0, 1.0);
+              // Waveform — tap or drag to seek
+              LayoutBuilder(builder: (_, constraints) {
+                void seek(double dx) {
+                  final ratio = (dx / constraints.maxWidth).clamp(0.0, 1.0);
                   h.seekTo(Duration(milliseconds: (ratio * dur).round()));
-                },
-                child: SizedBox(
-                  height: 40,
-                  child: CustomPaint(
-                    size: const Size(double.infinity, 40),
-                    painter: _WaveformPainter(
-                      seed: seed,
-                      progress: progress,
-                      playedColor: accent,
-                      unplayedColor: kBorder.withAlpha(200),
+                }
+                return GestureDetector(
+                  onTapDown:           (d) => seek(d.localPosition.dx),
+                  onHorizontalDragUpdate: (d) => seek(d.localPosition.dx),
+                  child: SizedBox(
+                    height: 44,
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _WaveformPainter(
+                        seed: seed,
+                        progress: progress,
+                        playedColor: accent,
+                        unplayedColor: kBorder.withAlpha(200),
+                      ),
                     ),
                   ),
-                ),
-              ),
+                );
+              }),
               // Time labels
               Row(children: [
                 Text(_fmtMs(pos), style: const TextStyle(color: kFg2, fontSize: 10, fontFamily: 'Barlow')),
@@ -352,32 +354,81 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
       final track = snap.data;
       if (track == null) return const SizedBox.shrink();
       final stars = (track.rating / 20).round().clamp(0, 5);
+      String? lastLabel;
+      if (track.lastPlayed > 0) {
+        final diff = DateTime.now().difference(
+            DateTime.fromMillisecondsSinceEpoch(track.lastPlayed));
+        if (diff.inDays == 0) lastLabel = 'today';
+        else if (diff.inDays == 1) lastLabel = 'yesterday';
+        else lastLabel = '${diff.inDays}d ago';
+      }
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          // Star rating
           ...List.generate(5, (i) => GestureDetector(
             onTap: () => LibraryController.inst.setRating(track.path, (i + 1) * 20),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: Icon(
-                i < stars ? Icons.star : Icons.star_border,
-                color: i < stars ? const Color(0xFFFBBF24) : kFg3,
-                size: 18,
-              ),
+              child: Icon(i < stars ? Icons.star : Icons.star_border,
+                  color: i < stars ? const Color(0xFFFBBF24) : kFg3, size: 18),
             ),
           )),
           if (track.plays > 0) ...[
-            const SizedBox(width: 16),
-            Text(
-              '${track.plays} ${track.plays == 1 ? 'play' : 'plays'}',
-              style: const TextStyle(color: kFg3, fontSize: 10, letterSpacing: 0.5, fontFamily: 'Barlow'),
-            ),
+            const SizedBox(width: 14),
+            Text('${track.plays} plays', style: const TextStyle(
+                color: kFg3, fontSize: 10, letterSpacing: 0.5, fontFamily: 'Barlow')),
+            if (lastLabel != null) ...[
+              const Text(' · ', style: TextStyle(color: kFg3, fontSize: 10)),
+              Text('last $lastLabel', style: const TextStyle(
+                  color: kFg3, fontSize: 10, fontFamily: 'Barlow')),
+            ],
           ],
         ]),
       );
     },
   );
+
+  Widget _similarRow(Track? track) {
+    if (track == null || track.codec == 'LIVE') return const SizedBox.shrink();
+    final lib = LibraryController.inst;
+    final primary = track.artist
+        .split(RegExp(r'\s+(feat\.|ft\.|&|,)\s+', caseSensitive: false))
+        .first.trim();
+    final myGenres = (lib.artists[primary] ?? []).map((t) => t.genre)
+        .where((g) => g.isNotEmpty).toSet();
+    final similar = lib.artists.entries
+        .where((e) => e.key != primary)
+        .where((e) => myGenres.isNotEmpty
+            ? e.value.any((t) => myGenres.contains(t.genre)) : true)
+        .toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+    if (similar.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Padding(
+        padding: EdgeInsets.fromLTRB(20, 8, 20, 5),
+        child: Text('SIMILAR IN LIBRARY', style: TextStyle(
+            color: kFg3, fontSize: 8, letterSpacing: 2, fontFamily: 'Barlow')),
+      ),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(children: similar.take(8).map((e) => GestureDetector(
+          onTap: () => Get.to(() => ArtistDetailScreen(artistName: e.key)),
+          child: Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: kBg1, borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: kBorder)),
+            child: Text(e.key, style: const TextStyle(
+                color: kFg1, fontSize: 11, fontWeight: FontWeight.w500)),
+          ),
+        )).toList()),
+      ),
+      const SizedBox(height: 4),
+    ]);
+  }
+
 
   Widget _extraBar(AuradecAudioHandler h, Track? track) => Container(
     decoration: BoxDecoration(border: Border(top: BorderSide(color: kBorder.withAlpha(80)))),
@@ -454,41 +505,75 @@ class _NowPlayingScreenState extends State<NowPlayingScreen> {
   Widget _lyricsView(Track? track) {
     if (_lyricsLoading) return const Center(child: CircularProgressIndicator(color: kBrandOrange));
     if (_lyrics == null) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      const Icon(Icons.lyrics_outlined, color: kFg3, size: 40),
-      const SizedBox(height: 10),
-      const Text('No lyrics found', style: TextStyle(color: kFg2, fontSize: 14)),
+      const Icon(Icons.lyrics_outlined, color: kFg3, size: 48),
+      const SizedBox(height: 12),
+      const Text('No lyrics found', style: TextStyle(color: kFg2, fontSize: 15, fontWeight: FontWeight.w600)),
       const SizedBox(height: 4),
-      const Text('LRCLIB · NetEase searched', style: TextStyle(color: kFg3, fontSize: 11)),
+      const Text('Searched LRCLIB & NetEase', style: TextStyle(color: kFg3, fontSize: 11)),
     ]));
 
     return StreamBuilder<int>(stream: AuradecAudioHandler.inst.positionMs, builder: (_, snap) {
-      final posSec = (snap.data ?? 0) / 1000.0;
-      final lines = _lyrics!.hasSynced ? _lyrics!.synced : _lyrics!.plain.split('\n').map((l) => LyricLine(0, l)).toList();
-      final activeIdx = _lyrics!.hasSynced ? lines.lastIndexWhere((l) => l.time <= posSec) : -1;
+      final posSec   = (snap.data ?? 0) / 1000.0;
+      final lines    = _lyrics!.hasSynced
+          ? _lyrics!.synced
+          : _lyrics!.plain.split('\n').map((l) => LyricLine(0, l)).toList();
+      final activeIdx = _lyrics!.hasSynced
+          ? lines.lastIndexWhere((l) => l.time <= posSec)
+          : -1;
 
-      return ListView.builder(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-        itemCount: lines.length + 1,
-        itemBuilder: (ctx, i) {
-          if (i == lines.length) return Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text('${_lyrics!.source} · ${_lyrics!.hasSynced ? "Synced" : "Plain text"}',
-              style: const TextStyle(color: kFg3, fontSize: 9, letterSpacing: 1.5), textAlign: TextAlign.center),
-          );
-          final l = lines[i];
-          final isActive = i == activeIdx;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Text(l.text.isEmpty ? ' ' : l.text, style: TextStyle(
-              fontFamily: isActive ? 'Syne' : 'Barlow',
-              fontWeight: isActive ? FontWeight.w800 : FontWeight.w300,
-              fontSize: isActive ? 22 : 16,
-              color: isActive ? kFg1 : const Color(0x6AECE5D8),
-              height: 1.3,
-            )),
-          );
-        },
-      );
+      if (activeIdx >= 0 && activeIdx != _lastLyricsIdx) {
+        _lastLyricsIdx = activeIdx;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_lyricsScroll.hasClients) {
+            final target = (activeIdx * 52.0 - 120).clamp(
+                0.0, _lyricsScroll.position.maxScrollExtent);
+            _lyricsScroll.animateTo(target,
+                duration: const Duration(milliseconds: 400), curve: Curves.easeOut);
+          }
+        });
+      }
+
+      return Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+          child: Row(children: [
+            const Text('LYRICS', style: TextStyle(color: kFg3, fontSize: 9, letterSpacing: 2.5, fontFamily: 'Barlow')),
+            const SizedBox(width: 10),
+            if (_lyrics!.hasSynced) ...[
+              Container(width: 6, height: 6,
+                  decoration: const BoxDecoration(color: kBrandGreen, shape: BoxShape.circle)),
+              const SizedBox(width: 4),
+              const Text('SYNCED', style: TextStyle(color: kBrandGreen, fontSize: 9, letterSpacing: 1.5, fontFamily: 'Barlow')),
+            ],
+            const Spacer(),
+            Text(_lyrics!.source, style: const TextStyle(color: kFg3, fontSize: 9, fontFamily: 'Barlow')),
+          ]),
+        ),
+        Expanded(child: ListView.builder(
+          controller: _lyricsScroll,
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          itemCount: lines.length,
+          itemBuilder: (ctx, i) {
+            final l = lines[i];
+            final isActive = i == activeIdx;
+            if (l.text.trim().isEmpty) return const SizedBox(height: 10);
+            return AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                fontFamily: isActive ? 'Syne' : 'Barlow',
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w300,
+                fontSize: isActive ? 24 : 16,
+                color: isActive ? kFg1 : const Color(0x55ECE5D8),
+                height: 1.35,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(l.text),
+              ),
+            );
+          },
+        )),
+      ]);
     });
   }
 

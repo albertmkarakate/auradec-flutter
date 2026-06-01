@@ -64,6 +64,31 @@ class SettingsScreen extends StatelessWidget {
               onTap: () => _confirmClear()),
         ]),
 
+        // ── METADATA & TAGS ───────────────────────────────────────
+        _groupLabel('Metadata & Tags', kBrandGold),
+        _groupCard([
+          _navTile(Icons.edit_note, 'Artist separators',
+              'feat. · ft. · & · , — split multi-artist tags', kBrandGold,
+              onTap: () => _showArtistSepsSheet(context)),
+          _navTile(Icons.image_search, 'Artwork cache',
+              'Clear embedded cover art cache', kBrandGold,
+              onTap: () {}),
+          _navTile(Icons.library_books_outlined, 'MusicBrainz',
+              'Auto-tag tracks on import', kBrandGold,
+              onTap: () {}),
+        ]),
+
+        // ── INTELLIGENCE ──────────────────────────────────────────
+        _groupLabel('Intelligence', const Color(0xFFA78BFA)),
+        _groupCard([
+          _navTile(Icons.auto_awesome, 'AI engine',
+              'Artist bios · similar artists · auto-fix', const Color(0xFFA78BFA),
+              onTap: () => _showIntelligenceSheet(context)),
+          _navTile(Icons.record_voice_over_outlined, 'Biography source',
+              'Wikipedia · Last.fm · AI auto-research', const Color(0xFFA78BFA),
+              onTap: () {}),
+        ]),
+
         // ── CONNECTIVITY ──────────────────────────────────────────
         _groupLabel('Connectivity', const Color(0xFF60A5FA)),
         _groupCard([
@@ -95,6 +120,14 @@ class SettingsScreen extends StatelessWidget {
               'ExoPlayer · just_audio · MediaSession', kFg2),
           _navTile(Icons.code, 'Built with',
               'Flutter · Dart · ExoPlayer', kFg2),
+          Obx(() {
+            final lib = LibraryController.inst;
+            final totalMs = lib.tracks.fold(0, (s, t) => s + t.durationMs);
+            final totalH  = totalMs ~/ 3600000;
+            final totalM  = (totalMs % 3600000) ~/ 60000;
+            return _navTile(Icons.storage_outlined, 'Catalog',
+                '${lib.tracks.length} tracks · ${totalH}h ${totalM}m total', kFg2);
+          }),
         ]),
       ])),
     );
@@ -247,6 +280,132 @@ class SettingsScreen extends StatelessWidget {
     const channel = MethodChannel('app.auradec/system');
     channel.invokeMethod('openBluetoothSettings').catchError((_) {});
   }
+
+  void _showArtistSepsSheet(BuildContext context) {
+    const seps = [
+      ['feat.', 'Featured artist'],
+      ['ft.',   'Featured (short)'],
+      ['&',     'Ampersand'],
+      [',',     'Comma'],
+      [';',     'Semicolon'],
+      ['x',     'Collab (x)'],
+      ['vs',    'Versus'],
+      ['with',  'With'],
+    ];
+    showModalBottomSheet(
+      context: context, backgroundColor: kBg1, isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(top: false, child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('METADATA & TAGS', style: TextStyle(
+              color: kBrandGold, fontSize: 9, letterSpacing: 2.5, fontFamily: 'Barlow')),
+          const SizedBox(height: 4),
+          const Text('Artist Separators', style: TextStyle(
+              color: kFg1, fontSize: 22, fontWeight: FontWeight.w800, fontFamily: 'Syne')),
+          const SizedBox(height: 6),
+          const Text(
+            'Tokens that split a multi-artist tag into individual, linkable artists. '
+            'e.g. "Burna Boy feat. Wizkid" → "Burna Boy" + "Wizkid"',
+            style: TextStyle(color: kFg2, fontSize: 12, height: 1.5)),
+          const SizedBox(height: 16),
+          Wrap(spacing: 8, runSpacing: 8, children: seps.map((s) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: kBrandOrange.withAlpha(15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: kBrandOrange.withAlpha(50))),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(s[0], style: const TextStyle(
+                  color: kBrandOrange, fontSize: 12, fontFamily: 'Barlow', fontWeight: FontWeight.w600)),
+              const SizedBox(width: 8),
+              Text(s[1], style: const TextStyle(color: kFg2, fontSize: 11)),
+            ]),
+          )).toList()),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: kBg2, borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBorder)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Live preview', style: TextStyle(
+                  color: kFg3, fontSize: 8, letterSpacing: 1.5, fontFamily: 'Barlow')),
+              const SizedBox(height: 8),
+              const Text('"Davido, Musa Keys feat. Toni Braxton"',
+                  style: TextStyle(color: kFg2, fontSize: 11, fontFamily: 'Barlow')),
+              const SizedBox(height: 6),
+              Wrap(spacing: 6, runSpacing: 4, children: [
+                for (final name in ['Davido', 'Musa Keys', 'Toni Braxton'])
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: kBrandOrange.withAlpha(20),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: kBrandOrange.withAlpha(40))),
+                    child: Text(name, style: const TextStyle(
+                        color: kBrandOrange, fontSize: 11, fontWeight: FontWeight.w500))),
+              ]),
+            ]),
+          ),
+        ]),
+      )),
+    );
+  }
+
+  void _showIntelligenceSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context, backgroundColor: kBg1, isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(top: false, child: SingleChildScrollView(child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(padding: EdgeInsets.fromLTRB(20, 20, 20, 4),
+            child: Text('INTELLIGENCE', style: TextStyle(
+                color: Color(0xFFA78BFA), fontSize: 9, letterSpacing: 2.5, fontFamily: 'Barlow'))),
+          const Padding(padding: EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Text('AI Engine', style: TextStyle(
+                color: kFg1, fontSize: 22, fontWeight: FontWeight.w800, fontFamily: 'Syne'))),
+          _settingRow(Icons.auto_awesome, 'Artist biographies',
+              'Fetch from Wikipedia on first view', trailing: Switch(
+                value: true, onChanged: (_) {},
+                activeColor: const Color(0xFFA78BFA), inactiveTrackColor: kBorder)),
+          _settingRow(Icons.people_outline, 'Similar artists',
+              'Show in Now Playing screen', trailing: Switch(
+                value: true, onChanged: (_) {},
+                activeColor: const Color(0xFFA78BFA), inactiveTrackColor: kBorder)),
+          _settingRow(Icons.translate, 'Lyric translation',
+              'Auto-translate non-English lyrics', trailing: Switch(
+                value: false, onChanged: (_) {},
+                activeColor: const Color(0xFFA78BFA), inactiveTrackColor: kBorder)),
+          _settingRow(Icons.refresh, 'Bio refresh cadence',
+              'Re-fetch artist biographies', trailing: DropdownButton<String>(
+                value: 'Weekly',
+                dropdownColor: kBg2,
+                style: const TextStyle(color: kFg1, fontSize: 12),
+                underline: const SizedBox.shrink(),
+                items: ['Off', 'Daily', 'Weekly', 'Monthly']
+                    .map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                onChanged: (_) {},
+              )),
+        ]),
+      ))),
+    );
+  }
+
+  Widget _settingRow(IconData icon, String title, String subtitle, {required Widget trailing}) =>
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(children: [
+        Icon(icon, color: kFg2, size: 20),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w500)),
+          Text(subtitle, style: const TextStyle(color: kFg2, fontSize: 11)),
+        ])),
+        trailing,
+      ]),
+    );
 
   Widget _colorSchemeTile(BuildContext context) {
     return Obx(() {
