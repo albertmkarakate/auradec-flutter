@@ -118,6 +118,25 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   void _showSortSheet() {
+    // Tab-specific sort options
+    final isAlbums  = _activeTab == 'albums';
+    final isArtists = _activeTab == 'artists';
+
+    final Map<_SortMode, String> labels = isAlbums
+        ? {_SortMode.title: 'Name', _SortMode.duration: 'Track count', _SortMode.dateAdded: 'Year'}
+        : isArtists
+        ? {_SortMode.title: 'Name', _SortMode.duration: 'Track count'}
+        : {_SortMode.title: 'Title', _SortMode.artist: 'Artist', _SortMode.album: 'Album',
+           _SortMode.dateAdded: 'Year / Date', _SortMode.duration: 'Duration'};
+
+    final Map<_SortMode, IconData> icons = {
+      _SortMode.title:     Icons.sort_by_alpha,
+      _SortMode.artist:    Icons.mic,
+      _SortMode.album:     Icons.album,
+      _SortMode.dateAdded: Icons.calendar_today_outlined,
+      _SortMode.duration:  isAlbums || isArtists ? Icons.format_list_numbered : Icons.timer_outlined,
+    };
+
     showModalBottomSheet(
       context: context, backgroundColor: kBg1,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -125,7 +144,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Row(children: [
-            const Text('Sort by', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
+            Text('Sort ${isAlbums ? "albums" : isArtists ? "artists" : "tracks"}',
+                style: const TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
             const Spacer(),
             GestureDetector(
               onTap: () { setState(() => _sortAsc = !_sortAsc); setS(() {}); },
@@ -135,19 +155,21 @@ class _LibraryScreenState extends State<LibraryScreen>
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward, color: kBrandOrange, size: 14),
                   const SizedBox(width: 4),
-                  Text(_sortAsc ? 'A–Z' : 'Z–A', style: const TextStyle(color: kFg1, fontSize: 12)),
+                  Text(_sortAsc ? 'Ascending' : 'Descending',
+                      style: const TextStyle(color: kFg1, fontSize: 12)),
                 ]),
               ),
             ),
           ]),
-          const SizedBox(height: 12),
-          ..._SortMode.values.map((m) {
-            final labels = {_SortMode.title: 'Title', _SortMode.artist: 'Artist', _SortMode.album: 'Album', _SortMode.dateAdded: 'Date added', _SortMode.duration: 'Duration'};
-            final icons  = {_SortMode.title: Icons.sort_by_alpha, _SortMode.artist: Icons.mic, _SortMode.album: Icons.album, _SortMode.dateAdded: Icons.calendar_today, _SortMode.duration: Icons.timer_outlined};
+          const SizedBox(height: 8),
+          ...labels.entries.map((e) {
+            final m      = e.key;
+            final label  = e.value;
             final active = _sortMode == m;
             return ListTile(
               leading: Icon(icons[m], color: active ? kBrandOrange : kFg2, size: 20),
-              title: Text(labels[m]!, style: TextStyle(color: active ? kBrandOrange : kFg1, fontWeight: active ? FontWeight.w700 : FontWeight.normal)),
+              title: Text(label, style: TextStyle(color: active ? kBrandOrange : kFg1,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.normal)),
               trailing: active ? const Icon(Icons.check, color: kBrandOrange, size: 18) : null,
               onTap: () { setState(() => _sortMode = m); setS(() {}); },
               dense: true,
@@ -243,6 +265,37 @@ class _LibraryScreenState extends State<LibraryScreen>
       }
       filtered.sort(cmp);
 
+      if (!_gridLayout) {
+        // Compact list: smaller art, condensed padding
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 8),
+          itemCount: filtered.length,
+          itemBuilder: (ctx, i) {
+            final t = filtered[i];
+            return InkWell(
+              onTap: () {
+                PlayerController.inst.playTrack(t, queue: filtered);
+                Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                child: Row(children: [
+                  AlbumArt(artUri: t.artUri, filePath: t.filePath, seed: t.title, size: 36, radius: 7),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(t.title, style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w500),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('${t.artist} · ${t.album}', style: const TextStyle(color: kFg2, fontSize: 11),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ])),
+                  Text(_fmtMs(t.durationMs), style: const TextStyle(color: kFg3, fontSize: 10)),
+                ]),
+              ),
+            );
+          },
+        );
+      }
+
       return ListView.builder(
         padding: const EdgeInsets.only(bottom: 8),
         itemCount: filtered.length,
@@ -257,11 +310,60 @@ class _LibraryScreenState extends State<LibraryScreen>
     });
   }
 
+  String _fmtMs(int ms) {
+    final m = ms ~/ 60000; final s = (ms % 60000) ~/ 1000;
+    return '$m:${s.toString().padLeft(2,'0')}';
+  }
+
   Widget _albumGrid() {
     return Obx(() {
       final albums = LibraryController.inst.albums;
       if (albums.isEmpty) return const SizedBox();
-      final keys = albums.keys.toList()..sort();
+      var keys = albums.keys.toList();
+      // Sort albums
+      switch (_sortMode) {
+        case _SortMode.duration: // reuse as "track count"
+          keys.sort((a, b) {
+            final r = albums[a]!.length.compareTo(albums[b]!.length);
+            return _sortAsc ? r : -r;
+          });
+          break;
+        case _SortMode.dateAdded: // reuse as year
+          keys.sort((a, b) {
+            final ya = albums[a]!.isNotEmpty ? albums[a]!.first.year : 0;
+            final yb = albums[b]!.isNotEmpty ? albums[b]!.first.year : 0;
+            return _sortAsc ? ya.compareTo(yb) : yb.compareTo(ya);
+          });
+          break;
+        default:
+          keys.sort((a, b) => _sortAsc ? a.compareTo(b) : b.compareTo(a));
+      }
+
+      if (!_gridLayout) {
+        // List view
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: 8),
+          itemCount: keys.length,
+          itemBuilder: (ctx, i) {
+            final name = keys[i];
+            final trks = albums[name]!;
+            final first = trks.isNotEmpty ? trks.first : null;
+            return ListTile(
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: name, size: 52, radius: 8),
+              ),
+              title: Text(name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(
+                '${first?.artist ?? ''} · ${trks.length} tracks${first?.year != null && first!.year > 0 ? ' · ${first.year}' : ''}',
+                style: const TextStyle(color: kFg2, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+              trailing: const Icon(Icons.chevron_right, color: kFg3),
+              onTap: () => Get.to(() => AlbumDetailScreen(albumName: name, tracks: trks)),
+            );
+          },
+        );
+      }
+
       return GridView.builder(
         padding: const EdgeInsets.all(12),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -270,8 +372,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         ),
         itemCount: keys.length,
         itemBuilder: (ctx, i) {
-          final name  = keys[i];
-          final trks  = albums[name]!;
+          final name = keys[i];
+          final trks = albums[name]!;
           return _albumCard(name, trks);
         },
       );
@@ -307,8 +409,17 @@ class _LibraryScreenState extends State<LibraryScreen>
   Widget _artistList() {
     return Obx(() {
       final artists = LibraryController.inst.artists;
-      final keys    = artists.keys.toList()..sort();
+      var keys = artists.keys.toList();
       if (keys.isEmpty) return const SizedBox();
+      // Sort artists
+      if (_sortMode == _SortMode.duration) {
+        keys.sort((a, b) {
+          final r = (artists[a]?.length ?? 0).compareTo(artists[b]?.length ?? 0);
+          return _sortAsc ? r : -r;
+        });
+      } else {
+        keys.sort((a, b) => _sortAsc ? a.compareTo(b) : b.compareTo(a));
+      }
       return ListView.builder(
         itemCount: keys.length,
         itemBuilder: (ctx, i) {
