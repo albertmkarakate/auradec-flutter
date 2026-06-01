@@ -64,6 +64,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         child: Column(children: [
           _buildHeader(),
           _buildTabBar(),
+          _actionToolbar(),
           Expanded(child: _buildBody()),
         ]),
       ),
@@ -278,6 +279,83 @@ class _LibraryScreenState extends State<LibraryScreen>
       ),
     );
   }
+
+  Widget _actionToolbar() {
+    final grid = _gridLayout[_activeTab] ?? false;
+    const sortLabels = {
+      _SortMode.title:    'Title',
+      _SortMode.artist:   'Artist',
+      _SortMode.album:    'Album',
+      _SortMode.dateAdded:'Date',
+      _SortMode.duration: 'Duration',
+    };
+    final sortLabel = sortLabels[_sortMode] ?? 'Title';
+    final sortDir = _sortAsc ? '↑' : '↓';
+    return Container(
+      height: 44,
+      decoration: const BoxDecoration(
+        color: kBg1,
+        border: Border(bottom: BorderSide(color: kBorder)),
+      ),
+      child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), children: [
+        _tbBtn(Icons.play_arrow, 'Play all', onTap: () {
+          final lib = LibraryController.inst;
+          if (lib.tracks.isEmpty) return;
+          PlayerController.inst.playTrack(lib.tracks.first, queue: lib.tracks.toList());
+          Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+        }),
+        _tbBtn(Icons.shuffle, 'Shuffle', onTap: () {
+          final lib = LibraryController.inst;
+          if (lib.tracks.isEmpty) return;
+          final q = lib.tracks.toList()..shuffle();
+          PlayerController.inst.playTrack(q.first, queue: q);
+          Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+        }),
+        _tbDivider(),
+        _tbBtn(Icons.sort, '$sortLabel $sortDir', active: true, onTap: _showSortSheet),
+        _tbBtn(grid ? Icons.view_list : Icons.grid_view, grid ? 'List' : 'Grid',
+            onTap: () => setState(() => _gridLayout[_activeTab] = !grid)),
+        _tbBtn(Icons.add, 'New', onTap: _showLibraryMenu),
+        Obx(() {
+          final scanning = LibraryController.inst.isScanning.value;
+          return _tbBtn(scanning ? Icons.hourglass_bottom : Icons.manage_search,
+              scanning ? 'Scanning…' : 'Scan device',
+              accent: const Color(0xFF29F89E),
+              onTap: scanning ? null : () => LibraryController.inst.scanLibrary());
+        }),
+        _tbBtn(Icons.folder_outlined, 'Folders', accent: kBrandGold,
+            onTap: () => Get.to(() => const FolderPickerScreen())),
+      ]),
+    );
+  }
+
+  Widget _tbBtn(IconData icon, String label,
+      {VoidCallback? onTap, bool active = false, Color? accent}) {
+    final col = active ? kBrandOrange : (accent ?? kFg2);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: active ? kBrandOrange.withAlpha(20) : kBg2,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: active ? kBrandOrange.withAlpha(90) : kBorder),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, color: col, size: 14),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: col, fontSize: 10, fontFamily: 'Barlow',
+              fontWeight: active ? FontWeight.w600 : FontWeight.w400, letterSpacing: 0.3)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _tbDivider() => Container(
+    width: 1, height: 20, color: kBorder,
+    margin: const EdgeInsets.only(right: 6),
+  );
 
   Widget _buildBody() {
     return TabBarView(controller: _tabs, children: [

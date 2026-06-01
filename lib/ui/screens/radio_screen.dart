@@ -54,7 +54,7 @@ class _RadioScreenState extends State<RadioScreen>
     _GenreCard('Jazz/Soul',  Color(0xFFFBBF24), '🎷', 'Jazz, soul & neo-soul'),
   ];
 
-  static const _genreFilters = ['All', 'World', 'Electronic', 'Jazz/Soul', 'Ambient', 'Hip-hop'];
+  static const _genreFilters = ['All', 'World', 'Electronic', 'Jazz/Soul', 'Ambient', 'Hip-hop', 'Talk'];
 
   @override
   void initState() {
@@ -78,8 +78,8 @@ class _RadioScreenState extends State<RadioScreen>
         _tabBar(),
         Expanded(child: TabBarView(controller: _tabs, children: [
           _stationsTab(),
-          _genresTab(),
           _artistRadioTab(),
+          _genresTab(),
         ])),
       ])),
     );
@@ -112,7 +112,7 @@ class _RadioScreenState extends State<RadioScreen>
         indicatorColor: kBrandOrange,
         indicatorWeight: 2,
         labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-        tabs: const [Tab(text: 'Stations'), Tab(text: 'Genres'), Tab(text: 'Artist')],
+        tabs: const [Tab(text: 'Stations'), Tab(text: 'Artist'), Tab(text: 'Genre')],
       ),
     );
   }
@@ -179,36 +179,28 @@ class _RadioScreenState extends State<RadioScreen>
         ),
         child: Row(children: [
           Container(
-            width: 52, height: 52,
+            width: 48, height: 48,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              gradient: LinearGradient(
-                colors: [s.color.withAlpha(80), s.color.withAlpha(30)],
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
-              ),
+              color: s.color.withAlpha(32),
+              border: Border.all(color: s.color.withAlpha(50)),
             ),
-            child: Center(child: Text(s.flag, style: const TextStyle(fontSize: 22))),
+            child: Icon(Icons.radio, color: s.color, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(s.name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text(s.nowPlaying, style: TextStyle(color: kFg2, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
             Row(children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: s.color.withAlpha(25),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: s.color.withAlpha(60)),
-                ),
-                child: Text(s.genre, style: TextStyle(color: s.color, fontSize: 8, fontWeight: FontWeight.w600)),
-              ),
-              const SizedBox(width: 8),
-              Text('${_fmt(s.listeners)} listeners · ${s.bitrate}kbps',
-                  style: const TextStyle(color: kFg3, fontSize: 9)),
+              Flexible(child: Text(s.name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w700),
+                  maxLines: 1, overflow: TextOverflow.ellipsis)),
+              const SizedBox(width: 5),
+              Text(s.flag, style: const TextStyle(fontSize: 12)),
             ]),
+            const SizedBox(height: 2),
+            Text('♪ ${s.nowPlaying}', style: const TextStyle(color: kFg2, fontSize: 10),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 3),
+            Text('${_fmt(s.listeners)}k listening · ${s.bitrate}kbps · ${s.genre}',
+                style: const TextStyle(color: kFg3, fontSize: 8)),
           ])),
           Column(mainAxisSize: MainAxisSize.min, children: [
             Container(
@@ -365,7 +357,7 @@ class _RadioScreenState extends State<RadioScreen>
   }
 
   String _fmt(int n) {
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}k';
+    if (n >= 1000) return (n / 1000).toStringAsFixed(1);
     return n.toString();
   }
 }

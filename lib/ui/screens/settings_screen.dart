@@ -34,8 +34,11 @@ class SettingsScreen extends StatelessWidget {
         // ── SOUND ─────────────────────────────────────────────────
         _groupLabel('Sound', kBrandGold),
         _groupCard([
+          _navTile(Icons.graphic_eq, 'Audio',
+              'Output · codec · sample rate', kBrandGold,
+              onTap: () => _showAudioSheet(context)),
           _navTile(Icons.tune, 'Playback',
-              'Crossfade · gapless · skip silence', kBrandGold,
+              'Crossfade · gapless · normalise', kBrandGold,
               onTap: () => _showPlaybackSheet()),
           _navTile(Icons.equalizer, 'Equaliser',
               '10-band EQ · presets', kBrandGold,
@@ -92,8 +95,11 @@ class SettingsScreen extends StatelessWidget {
         // ── CONNECTIVITY ──────────────────────────────────────────
         _groupLabel('Connectivity', const Color(0xFF60A5FA)),
         _groupCard([
+          _navTile(Icons.wifi, 'Devices & Sync',
+              'Phone ⇄ PC · server role', const Color(0xFF60A5FA),
+              onTap: () {}),
           _navTile(Icons.radio_outlined, 'Scrobbling',
-              'Last.fm · ListenBrainz', const Color(0xFF60A5FA),
+              'Last.fm · ListenBrainz · webhook', const Color(0xFF60A5FA),
               onTap: () => _showScrobbleSheet(context)),
         ]),
 
@@ -101,14 +107,41 @@ class SettingsScreen extends StatelessWidget {
         _groupLabel('Android', const Color(0xFF34D399)),
         _groupCard([
           _navTile(Icons.notifications_outlined, 'Notifications',
-              'Lock screen · playback channel', const Color(0xFF34D399),
-              onTap: () => _openAndroidNotificationSettings()),
-          _navTile(Icons.battery_charging_full_outlined, 'Battery & Background',
-              'Prevent system from killing playback', const Color(0xFF34D399),
-              onTap: () => _openAndroidBatterySettings()),
+              'Channels · lock screen · widget', const Color(0xFF34D399),
+              onTap: () => _openAndroidNotificationSettings(),
+              badge: 'ANDROID'),
+          _navTile(Icons.battery_charging_full_outlined, 'Battery & Service',
+              'Background · wake lock · foreground', const Color(0xFF34D399),
+              onTap: () => _openAndroidBatterySettings(),
+              badge: 'ANDROID'),
           _navTile(Icons.bluetooth_outlined, 'Bluetooth & Audio',
-              'A2DP · LDAC · audio output', const Color(0xFF34D399),
-              onTap: () => _openBluetoothSettings()),
+              'LDAC · aptX · A2DP profile', const Color(0xFF34D399),
+              onTap: () => _openBluetoothSettings(),
+              badge: 'ANDROID'),
+          _navTile(Icons.directions_car_outlined, 'Android Auto',
+              'Car display · playback mode', const Color(0xFF34D399),
+              onTap: () {},
+              badge: 'ANDROID'),
+          _navTile(Icons.watch_outlined, 'Wear OS',
+              'Companion sync · watch controls', const Color(0xFF34D399),
+              onTap: () {},
+              badge: 'ANDROID'),
+          _navTile(Icons.grid_view_outlined, 'Widget & Quick Tile',
+              'Home screen & Quick Settings', const Color(0xFF34D399),
+              onTap: () {},
+              badge: 'ANDROID'),
+          _navTile(Icons.folder_outlined, 'Storage & SAF',
+              'Scoped storage · cache · paths', const Color(0xFF34D399),
+              onTap: () {},
+              badge: 'ANDROID'),
+        ]),
+
+        // ── ACCESSIBILITY ─────────────────────────────────────────
+        _groupLabel('Accessibility', kFg3),
+        _groupCard([
+          _navTile(Icons.accessibility_new_outlined, 'Accessibility',
+              'Text size · TalkBack · motion', kFg2,
+              onTap: () {}),
         ]),
 
         // ── ABOUT ─────────────────────────────────────────────────
@@ -150,7 +183,7 @@ class SettingsScreen extends StatelessWidget {
   );
 
   Widget _navTile(IconData icon, String title, String subtitle, Color iconColor,
-      {VoidCallback? onTap, Widget? trailing}) {
+      {VoidCallback? onTap, Widget? trailing, String? badge}) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -167,7 +200,22 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w500)),
+            Row(children: [
+              Text(title, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w500)),
+              if (badge != null) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF34D399).withAlpha(30),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFF34D399).withAlpha(60)),
+                  ),
+                  child: Text(badge, style: const TextStyle(
+                    color: Color(0xFF34D399), fontSize: 7, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+                ),
+              ],
+            ]),
             Text(subtitle, style: const TextStyle(color: kFg2, fontSize: 11),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
           ])),
@@ -205,6 +253,39 @@ class SettingsScreen extends StatelessWidget {
           ]),
         );
       })),
+    );
+  }
+
+  void _showAudioSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context, backgroundColor: kBg1, isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(top: false, child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Audio', style: TextStyle(color: kFg1, fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 16),
+          _sheetRow('Output device', 'System default', Icons.speaker_outlined),
+          _sheetRow('Audio codec', 'AAC / MP3 / FLAC', Icons.audiotrack_outlined),
+          _sheetRow('Sample rate', '44.1 kHz', Icons.waves_outlined),
+          _sheetRow('Bit depth', '16-bit', Icons.memory_outlined),
+          _sheetRow('Resampler', 'SoX HQ', Icons.graphic_eq),
+        ]),
+      )),
+    );
+  }
+
+  Widget _sheetRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(children: [
+        Icon(icon, color: kFg3, size: 18),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label, style: const TextStyle(color: kFg1, fontSize: 13))),
+        Text(value, style: const TextStyle(color: kFg2, fontSize: 12)),
+        const SizedBox(width: 6),
+        const Icon(Icons.chevron_right, color: kFg3, size: 16),
+      ]),
     );
   }
 
