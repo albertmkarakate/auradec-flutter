@@ -23,6 +23,7 @@ class AuradecAudioHandler {
   // Settings toggles
   final gaplessEnabled      = false.obs;
   final skipSilenceEnabled  = false.obs;
+  final crossfadeSecs       = 0.obs;
 
   // Reactive state (GetX-friendly observables via RxDart)
   final _currentTrack   = BehaviorSubject<Track?>.seeded(null);
@@ -190,18 +191,19 @@ class AuradecAudioHandler {
     } else {
       _queueIndex = (_queueIndex + 1) % _queue.length;
     }
-    await loadTrack(_queue[_queueIndex]);
+    final next = _queue[_queueIndex];
+    await _fadeTransition(crossfadeSecs.value * 500, () => loadTrack(next));
   }
 
   Future<void> skipToPrev() async {
     if (_queue.isEmpty) return;
-    // If >3s in, restart current track (Namida behaviour)
     if (positionMsValue > 3000) {
       await seekTo(Duration.zero);
       return;
     }
     _queueIndex = (_queueIndex - 1 + _queue.length) % _queue.length;
-    await loadTrack(_queue[_queueIndex]);
+    final prev = _queue[_queueIndex];
+    await _fadeTransition(crossfadeSecs.value * 300, () => loadTrack(prev));
   }
 
   void _onTrackEnded() {
@@ -261,13 +263,36 @@ class AuradecAudioHandler {
 
   Future<void> setGapless(bool enabled) async {
     gaplessEnabled.value = enabled;
-    // just_audio gapless: use silence removal for local files
     try { await _player.setSkipSilenceEnabled(false); } catch (_) {}
   }
 
   Future<void> setSkipSilence(bool enabled) async {
     skipSilenceEnabled.value = enabled;
     try { await _player.setSkipSilenceEnabled(enabled); } catch (_) {}
+  }
+
+  Future<void> setCrossfade(int secs) async {
+    crossfadeSecs.value = secs.clamp(0, 10);
+  }
+
+  // Fade volume to 0 over [ms] milliseconds, run [action], then fade back up
+  Future<void> _fadeTransition(int ms, Future<void> Function() action) async {
+    if (ms <= 0) { await action(); return; }
+    final target = volumeValue;
+    const steps = 20;
+    final stepMs = ms ~/ steps;
+    // Fade out
+    for (int i = steps; i >= 0; i--) {
+      await _player.setVolume(target * i / steps);
+      await Future.delayed(Duration(milliseconds: stepMs));
+    }
+    await action();
+    // Fade in
+    for (int i = 0; i <= steps; i++) {
+      await _player.setVolume(target * i / steps);
+      await Future.delayed(Duration(milliseconds: stepMs));
+    }
+    await _player.setVolume(target);
   }
 
   void dispose() {

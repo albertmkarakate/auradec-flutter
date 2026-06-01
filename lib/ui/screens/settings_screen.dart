@@ -196,6 +196,25 @@ class SettingsScreen extends StatelessWidget {
             value: h.skipSilenceEnabled.value,
             onChanged: (v) => h.setSkipSilence(v),
           ),
+          const SizedBox(height: 6),
+          Row(children: [
+            const Icon(Icons.swap_horiz, color: kBrandOrange, size: 20),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Crossfade', style: TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w500)),
+              Text(h.crossfadeSecs.value == 0
+                  ? 'Off' : '${h.crossfadeSecs.value}s fade between tracks',
+                  style: const TextStyle(color: kFg2, fontSize: 11)),
+            ])),
+            Text('${h.crossfadeSecs.value}s',
+                style: const TextStyle(color: kBrandOrange, fontSize: 12, fontWeight: FontWeight.w600)),
+          ]),
+          Slider(
+            value: h.crossfadeSecs.value.toDouble(),
+            min: 0, max: 10, divisions: 10,
+            activeColor: kBrandOrange, inactiveColor: kBorder,
+            onChanged: (v) => h.setCrossfade(v.round()),
+          ),
         ]),
       );
     });
