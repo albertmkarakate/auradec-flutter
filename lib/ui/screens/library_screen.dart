@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import '../../core/constants.dart';
 import '../../core/track.dart';
 import '../../controllers/library_controller.dart';
+import '../../services/smart_playlist_engine.dart';
+import '../widgets/smart_playlist_sheet.dart';
 import '../widgets/auradec_mark.dart';
 import 'analytics_screen.dart';
 import '../../controllers/player_controller.dart';
@@ -35,6 +37,23 @@ class _LibraryScreenState extends State<LibraryScreen>
   final _gridLayout = <String, bool>{
     'tracks': true, 'albums': true, 'artists': true, 'playlists': true, 'loved': false,
   };
+  // 3-way layout for albums & artists: 0=list, 1=details, 2=grid
+  final _viewMode = <String, int>{'albums': 2, 'artists': 2};
+
+  bool _isTriTab(String tab) => tab == 'albums' || tab == 'artists';
+
+  IconData _triIcon(int mode) =>
+      mode == 0 ? Icons.view_list : mode == 1 ? Icons.view_agenda : Icons.grid_view;
+
+  void _cycleLayout(String tab) {
+    setState(() {
+      if (_isTriTab(tab)) {
+        _viewMode[tab] = ((_viewMode[tab] ?? 2) + 1) % 3;
+      } else {
+        _gridLayout[tab] = !(_gridLayout[tab] ?? true);
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -145,14 +164,16 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   Widget _toolbarActions() {
     final hasToggle = _activeTab != 'loved';
-    final grid = _gridLayout[_activeTab] ?? false;
+    final tri = _isTriTab(_activeTab);
+    final mode = tri ? (_viewMode[_activeTab] ?? 2) : ((_gridLayout[_activeTab] ?? false) ? 2 : 0);
+    final active = mode != 0;
     return Row(children: [
       if (hasToggle)
         IconButton(
-          icon: Icon(grid ? Icons.view_list : Icons.grid_view,
-              color: grid ? kBrandOrange : kFg2, size: 22),
+          icon: Icon(tri ? _triIcon(mode) : (active ? Icons.view_list : Icons.grid_view),
+              color: active ? kBrandOrange : kFg2, size: 22),
           tooltip: 'Toggle layout',
-          onPressed: () => setState(() => _gridLayout[_activeTab] = !grid),
+          onPressed: () => _cycleLayout(_activeTab),
         ),
       Obx(() {
         final scanning = LibraryController.inst.isScanning.value;
@@ -282,7 +303,10 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   Widget _actionToolbar() {
+    final tri = _isTriTab(_activeTab);
+    final triMode = _viewMode[_activeTab] ?? 2;
     final grid = _gridLayout[_activeTab] ?? false;
+    const triLabels = ['List', 'Details', 'Grid'];
     const sortLabels = {
       _SortMode.title:    'Title',
       _SortMode.artist:   'Artist',
@@ -314,8 +338,9 @@ class _LibraryScreenState extends State<LibraryScreen>
         }),
         _tbDivider(),
         _tbBtn(Icons.sort, '$sortLabel $sortDir', active: true, onTap: _showSortSheet),
-        _tbBtn(grid ? Icons.view_list : Icons.grid_view, grid ? 'List' : 'Grid',
-            onTap: () => setState(() => _gridLayout[_activeTab] = !grid)),
+        _tbBtn(tri ? _triIcon(triMode) : (grid ? Icons.view_list : Icons.grid_view),
+            tri ? triLabels[triMode] : (grid ? 'List' : 'Grid'),
+            onTap: () => _cycleLayout(_activeTab)),
         _tbBtn(Icons.add, 'New', onTap: _showLibraryMenu),
         Obx(() {
           final scanning = LibraryController.inst.isScanning.value;
@@ -451,8 +476,10 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   Widget _albumGrid() {
     return Obx(() {
-      final albums = LibraryController.inst.albums;
-      if (albums.isEmpty) return const SizedBox();
+      final lib    = LibraryController.inst;
+      final albums = lib.albums;
+      if (lib.isScanning.value && albums.isEmpty) return _scanningState();
+      if (albums.isEmpty) return _emptyTabState('albums');
       var keys = albums.keys.toList();
       // Sort albums
       switch (_sortMode) {
@@ -473,8 +500,11 @@ class _LibraryScreenState extends State<LibraryScreen>
           keys.sort((a, b) => _sortAsc ? a.compareTo(b) : b.compareTo(a));
       }
 
-      if (!(_gridLayout['albums'] ?? true)) {
-        // List view
+      final mode = _viewMode['albums'] ?? 2;
+      if (mode != 2) {
+        // List (0) / Details (1) view
+        final details = mode == 1;
+        final artSize = details ? 72.0 : 52.0;
         return ListView.builder(
           padding: const EdgeInsets.only(bottom: 8),
           itemCount: keys.length,
@@ -482,16 +512,46 @@ class _LibraryScreenState extends State<LibraryScreen>
             final name = keys[i];
             final trks = albums[name]!;
             final first = trks.isNotEmpty ? trks.first : null;
+            final artist = first?.artist ?? '';
+            final year   = (first?.year != null && first!.year > 0) ? '${first.year} · ' : '';
+            final genre  = (details && first?.genre != null && first!.genre.isNotEmpty) ? ' · ${first.genre}' : '';
             return ListTile(
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: details ? 8 : 4),
               leading: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: name, size: 52, radius: 8),
+                child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: name, size: artSize, radius: 8),
               ),
-              title: Text(name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text(
-                '${first?.artist ?? ''} · ${trks.length} tracks${first?.year != null && first!.year > 0 ? ' · ${first.year}' : ''}',
-                style: const TextStyle(color: kFg2, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
-              trailing: const Icon(Icons.chevron_right, color: kFg3),
+              title: Text(name,
+                  style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w600),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (artist.isNotEmpty)
+                  Text(artist, style: const TextStyle(color: kFg2, fontSize: 11),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text('$year${trks.length} tracks$genre',
+                    style: const TextStyle(color: kFg3, fontSize: 10),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              ]),
+              isThreeLine: artist.isNotEmpty,
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                GestureDetector(
+                  onTap: () {
+                    if (trks.isEmpty) return;
+                    PlayerController.inst.playTrack(trks.first, queue: trks);
+                    Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+                  },
+                  child: Container(
+                    width: 30, height: 30,
+                    decoration: BoxDecoration(
+                      color: kBrandOrange.withAlpha(30), shape: BoxShape.circle,
+                      border: Border.all(color: kBrandOrange.withAlpha(80)),
+                    ),
+                    child: const Icon(Icons.play_arrow, color: kBrandOrange, size: 16),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right, color: kFg3),
+              ]),
               onTap: () => Get.to(() => AlbumDetailScreen(albumName: name, tracks: trks)),
               onLongPress: () => _showAlbumMenu(name, trks),
             );
@@ -517,6 +577,8 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   Widget _albumCard(String name, List<Track> tList) {
     final first  = tList.isNotEmpty ? tList.first : null;
+    final artist = first?.artist ?? '';
+    final year   = (first?.year != null && first!.year > 0) ? ' · ${first.year}' : '';
     return GestureDetector(
       onTap: () => Get.to(() => AlbumDetailScreen(albumName: name, tracks: tList)),
       onLongPress: () => _showAlbumMenu(name, tList),
@@ -526,15 +588,41 @@ class _LibraryScreenState extends State<LibraryScreen>
           border: Border.all(color: kBorder),
         ),
         child: Column(children: [
-          Expanded(child: ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-            child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: name, size: double.infinity, radius: 0),
-          )),
+          Expanded(child: Stack(fit: StackFit.expand, children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: name, size: double.infinity, radius: 0),
+            ),
+            // Play button overlay at bottom-right
+            Positioned(
+              right: 8, bottom: 8,
+              child: GestureDetector(
+                onTap: () {
+                  if (tList.isEmpty) return;
+                  PlayerController.inst.playTrack(tList.first, queue: tList);
+                  Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+                },
+                child: Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: kBrandOrange, shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: Colors.black.withAlpha(100), blurRadius: 8)],
+                  ),
+                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 18),
+                ),
+              ),
+            ),
+          ])),
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(name, style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-              Text('${tList.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
+              Text(name, style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w700),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (artist.isNotEmpty)
+                Text('$artist$year', style: const TextStyle(color: kFg2, fontSize: 10),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              Text('${tList.length} tracks', style: const TextStyle(color: kFg3, fontSize: 10)),
             ]),
           ),
         ]),
@@ -544,9 +632,11 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   Widget _artistList() {
     return Obx(() {
-      final artists = LibraryController.inst.artists;
+      final lib     = LibraryController.inst;
+      final artists = lib.artists;
       var keys = artists.keys.toList();
-      if (keys.isEmpty) return const SizedBox();
+      if (lib.isScanning.value && keys.isEmpty) return _scanningState();
+      if (keys.isEmpty) return _emptyTabState('artists');
       if (_sortMode == _SortMode.duration) {
         keys.sort((a, b) {
           final r = (artists[a]?.length ?? 0).compareTo(artists[b]?.length ?? 0);
@@ -556,31 +646,55 @@ class _LibraryScreenState extends State<LibraryScreen>
         keys.sort((a, b) => _sortAsc ? a.compareTo(b) : b.compareTo(a));
       }
 
-      if (_gridLayout['artists'] ?? true) {
+      final mode = _viewMode['artists'] ?? 2;
+      if (mode == 2) {
+        // Count albums per artist
+        final allAlbums = LibraryController.inst.albums;
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3, childAspectRatio: 0.82,
+            crossAxisCount: 3, childAspectRatio: 0.78,
             crossAxisSpacing: 10, mainAxisSpacing: 14,
           ),
           itemCount: keys.length,
           itemBuilder: (ctx, i) {
-            final name = keys[i];
-            final trks = artists[name]!;
+            final name  = keys[i];
+            final trks  = artists[name]!;
             final first = trks.isNotEmpty ? trks.first : null;
+            final albumCount = allAlbums.values
+                .where((tl) => tl.isNotEmpty && tl.first.artist == name)
+                .length;
             return GestureDetector(
               onTap: () => Get.to(() => ArtistDetailScreen(artistName: name)),
               onLongPress: () => _showArtistMenu(name),
               child: Column(children: [
-                Expanded(child: ClipOval(child: AlbumArt(
-                  artUri: first?.artUri, filePath: first?.filePath,
-                  seed: name, size: double.infinity, radius: 999,
-                ))),
-                const SizedBox(height: 5),
+                // Circle avatar with play overlay
+                AspectRatio(
+                  aspectRatio: 1,
+                  child: Stack(children: [
+                    ClipOval(child: AlbumArt(
+                      artUri: first?.artUri, filePath: first?.filePath,
+                      seed: name, size: double.infinity, radius: 999,
+                    )),
+                    // Subtle gradient ring for artists
+                    Positioned.fill(child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: kBorder.withAlpha(60), width: 1.5),
+                      ),
+                    )),
+                  ]),
+                ),
+                const SizedBox(height: 6),
                 Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: kFg1, fontSize: 11, fontWeight: FontWeight.w600)),
-                Text('${trks.length} tracks',
+                Text(
+                  albumCount > 0
+                    ? '${albumCount} albums · ${trks.length} tracks'
+                    : '${trks.length} tracks',
+                  textAlign: TextAlign.center,
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: kFg2, fontSize: 9)),
               ]),
             );
@@ -588,6 +702,10 @@ class _LibraryScreenState extends State<LibraryScreen>
         );
       }
 
+      // List (0) / Details (1)
+      final details = mode == 1;
+      final allAlbums = LibraryController.inst.albums;
+      final artSize = details ? 64.0 : 46.0;
       return ListView.builder(
         padding: const EdgeInsets.only(bottom: 80),
         itemCount: keys.length,
@@ -595,13 +713,20 @@ class _LibraryScreenState extends State<LibraryScreen>
           final name = keys[i];
           final trks = artists[name]!;
           final first = trks.isNotEmpty ? trks.first : null;
+          final albumCount = details
+              ? allAlbums.values.where((tl) => tl.isNotEmpty && tl.first.artist == name).length
+              : 0;
+          final sub = details && albumCount > 0
+              ? '$albumCount albums · ${trks.length} tracks'
+              : '${trks.length} tracks';
           return ListTile(
+            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: details ? 6 : 0),
             leading: ClipOval(child: AlbumArt(
               artUri: first?.artUri, filePath: first?.filePath,
-              seed: name, size: 46, radius: 23,
+              seed: name, size: artSize, radius: artSize / 2,
             )),
             title: Text(name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w500)),
-            subtitle: Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
+            subtitle: Text(sub, style: const TextStyle(color: kFg2, fontSize: 11)),
             trailing: const Icon(Icons.chevron_right, color: kFg3),
             onTap: () => Get.to(() => ArtistDetailScreen(artistName: name)),
             onLongPress: () => _showArtistMenu(name),
@@ -611,92 +736,282 @@ class _LibraryScreenState extends State<LibraryScreen>
     });
   }
 
+  // ── Smart / auto playlists ───────────────────────────────────────────────
+
+  /// Evaluate built-in presets using the rule engine.
+  List<_Smart> _buildSmartPlaylists(LibraryController lib) {
+    final all = lib.tracks.toList();
+    final out = kBuiltinPresets.map((p) {
+      final trks = evalPreset(p, all);
+      return _Smart(p.name, _presetIcon(p.icon), _hexColor(p.color), trks);
+    }).where((s) => s.tracks.isNotEmpty).toList();
+    return out;
+  }
+
+  static IconData _presetIcon(String name) {
+    switch (name) {
+      case 'favorite':              return Icons.favorite;
+      case 'star':                  return Icons.star;
+      case 'local_fire_department': return Icons.local_fire_department;
+      case 'history':               return Icons.history;
+      case 'repeat':                return Icons.repeat;
+      case 'diamond':               return Icons.diamond_outlined;
+      case 'fiber_new':             return Icons.fiber_new_outlined;
+      default:                      return Icons.playlist_play;
+    }
+  }
+
+  static Color _hexColor(String hex) {
+    try {
+      final h = hex.replaceFirst('#', '');
+      return Color(int.parse('FF$h', radix: 16));
+    } catch (_) {
+      return kBrandOrange;
+    }
+  }
+
+  void _playList(List<Track> list) {
+    if (list.isEmpty) return;
+    PlayerController.inst.playTrack(list.first, queue: list);
+    Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+  }
+
+  Widget _smartSection(List<_Smart> smarts) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text('SMART PLAYLISTS',
+              style: TextStyle(color: kBrandGold, fontSize: 9, letterSpacing: 2.5, fontFamily: 'Barlow')),
+        ),
+        SizedBox(height: 92, child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: smarts.length,
+          itemBuilder: (ctx, i) => _smartCard(smarts[i]),
+        )),
+      ]),
+    );
+  }
+
+  Widget _smartCard(_Smart s) => GestureDetector(
+    onTap: () => _playList(s.tracks),
+    child: Container(
+      width: 152,
+      margin: const EdgeInsets.only(right: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: s.color.withAlpha(70)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors: [s.color.withAlpha(38), kBg1],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(children: [
+            Container(
+              width: 30, height: 30,
+              decoration: BoxDecoration(color: s.color.withAlpha(40), shape: BoxShape.circle),
+              child: Icon(s.icon, color: s.color, size: 16),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(color: s.color.withAlpha(30), borderRadius: BorderRadius.circular(4)),
+              child: Text('SMART',
+                  style: TextStyle(color: s.color, fontSize: 7, letterSpacing: 1, fontFamily: 'Barlow')),
+            ),
+          ]),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text(s.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 2),
+            Text('${s.tracks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 10)),
+          ]),
+        ],
+      ),
+    ),
+  );
+
   Widget _playlists() {
     return Obx(() {
-      final lib = LibraryController.inst;
-      final pls = lib.playlists;
-
-      final useGrid = _gridLayout['playlists'] ?? true;
+      final lib        = LibraryController.inst;
+      final pls        = lib.playlists;
+      final useGrid    = _gridLayout['playlists'] ?? true;
+      final presets    = _buildSmartPlaylists(lib);
+      final userSmarts = pls.where((p) => p.smart).toList();
+      final manualPls  = pls.where((p) => !p.smart).toList();
 
       return Stack(children: [
-        pls.isEmpty
-            ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Icon(Icons.playlist_add, color: kFg3, size: 48),
-                const SizedBox(height: 12),
-                const Text('No playlists yet', style: TextStyle(color: kFg1, fontSize: 18, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                TextButton.icon(
-                  icon: const Icon(Icons.add, color: kBrandOrange),
-                  label: const Text('Create playlist', style: TextStyle(color: kBrandOrange)),
-                  onPressed: () => _createPlaylist(),
-                ),
-              ]))
-            : useGrid
-              ? GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, childAspectRatio: 0.82,
-                    crossAxisSpacing: 12, mainAxisSpacing: 12,
-                  ),
-                  itemCount: pls.length,
-                  itemBuilder: (ctx, i) {
-                    final pl = pls[i];
-                    final trks = lib.playlistTracks(pl);
-                    final first = trks.isNotEmpty ? trks.first : null;
-                    return GestureDetector(
-                      onTap: () => Get.to(() => PlaylistDetailScreen(playlist: pl)),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: kBg1, borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: kBorder),
-                        ),
-                        child: Column(children: [
-                          Expanded(child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-                            child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: pl.name, size: double.infinity, radius: 0),
-                          )),
-                          Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(pl.name, style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                              Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
-                            ]),
-                          ),
-                        ]),
-                      ),
-                    );
-                  },
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  itemCount: pls.length,
-                  itemBuilder: (ctx, i) {
-                    final pl = pls[i];
-                    final trks = lib.playlistTracks(pl);
-                    final first = trks.isNotEmpty ? trks.first : null;
-                    return ListTile(
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: pl.name, size: 48, radius: 8),
-                      ),
-                      title: Text(pl.name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w600)),
-                      subtitle: Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
-                      trailing: const Icon(Icons.chevron_right, color: kFg3),
-                      onTap: () => Get.to(() => PlaylistDetailScreen(playlist: pl)),
-                    );
-                  },
-                ),
+        Column(children: [
+          if (presets.isNotEmpty) _smartSection(presets),
+          if (userSmarts.isNotEmpty) _userSmartSection(userSmarts, lib),
+          Expanded(child: _manualSection(manualPls, lib, useGrid)),
+        ]),
         Positioned(
           right: 16, bottom: 16,
-          child: FloatingActionButton(
-            mini: true,
-            backgroundColor: kBrandOrange,
-            child: const Icon(Icons.add, color: Colors.white),
-            onPressed: () => _createPlaylist(),
-          ),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+            FloatingActionButton.extended(
+              heroTag: 'fab_smart',
+              backgroundColor: const Color(0xFF7C3AED),
+              icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+              label: const Text('Smart', style: TextStyle(color: Colors.white, fontSize: 12)),
+              onPressed: () => _createSmartPlaylist(),
+            ),
+            const SizedBox(height: 8),
+            FloatingActionButton(
+              mini: true,
+              heroTag: 'fab_manual',
+              backgroundColor: kBrandOrange,
+              child: const Icon(Icons.add, color: Colors.white),
+              onPressed: () => _createPlaylist(),
+            ),
+          ]),
         ),
       ]);
     });
+  }
+
+  // ── User smart playlists row ──────────────────────────────────────────────
+
+  Widget _userSmartSection(List<Playlist> smartPls, LibraryController lib) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text('MY SMART PLAYLISTS',
+              style: TextStyle(color: Color(0xFFA78BFA), fontSize: 9, letterSpacing: 2.5, fontFamily: 'Barlow')),
+        ),
+        SizedBox(height: 92, child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: smartPls.length,
+          itemBuilder: (ctx, i) {
+            final pl = smartPls[i];
+            final trks = lib.playlistTracks(pl);
+            final color = _hexColor(pl.color);
+            return GestureDetector(
+              onTap: () => _playList(trks),
+              onLongPress: () => _editSmartPlaylist(pl),
+              child: Container(
+                width: 152,
+                margin: const EdgeInsets.only(right: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: color.withAlpha(70)),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    colors: [color.withAlpha(38), kBg1],
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(children: [
+                      Container(
+                        width: 30, height: 30,
+                        decoration: BoxDecoration(color: color.withAlpha(40), shape: BoxShape.circle),
+                        child: Icon(Icons.auto_awesome, color: color, size: 14),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: color.withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                        child: Text('SMART', style: TextStyle(color: color, fontSize: 7, letterSpacing: 1, fontFamily: 'Barlow')),
+                      ),
+                    ]),
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                      Text(pl.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 10)),
+                    ]),
+                  ],
+                ),
+              ),
+            );
+          },
+        )),
+      ]),
+    );
+  }
+
+  // ── Manual playlists grid/list ────────────────────────────────────────────
+
+  Widget _manualSection(List<Playlist> pls, LibraryController lib, bool useGrid) {
+    if (pls.isEmpty) {
+      return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const Icon(Icons.playlist_add, color: kFg3, size: 48),
+        const SizedBox(height: 12),
+        const Text('No playlists yet', style: TextStyle(color: kFg1, fontSize: 18, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 6),
+        TextButton.icon(
+          icon: const Icon(Icons.add, color: kBrandOrange),
+          label: const Text('Create playlist', style: TextStyle(color: kBrandOrange)),
+          onPressed: () => _createPlaylist(),
+        ),
+      ]));
+    }
+    if (useGrid) {
+      return GridView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 120),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2, childAspectRatio: 0.82, crossAxisSpacing: 12, mainAxisSpacing: 12,
+        ),
+        itemCount: pls.length,
+        itemBuilder: (ctx, i) {
+          final pl = pls[i];
+          final trks = lib.playlistTracks(pl);
+          final first = trks.isNotEmpty ? trks.first : null;
+          return GestureDetector(
+            onTap: () => Get.to(() => PlaylistDetailScreen(playlist: pl)),
+            child: Container(
+              decoration: BoxDecoration(color: kBg1, borderRadius: BorderRadius.circular(16), border: Border.all(color: kBorder)),
+              child: Column(children: [
+                Expanded(child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                  child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: pl.name, size: double.infinity, radius: 0),
+                )),
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(pl.name, style: const TextStyle(color: kFg1, fontSize: 13, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
+                  ]),
+                ),
+              ]),
+            ),
+          );
+        },
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 120),
+      itemCount: pls.length,
+      itemBuilder: (ctx, i) {
+        final pl = pls[i];
+        final trks = lib.playlistTracks(pl);
+        final first = trks.isNotEmpty ? trks.first : null;
+        return ListTile(
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: AlbumArt(artUri: first?.artUri, filePath: first?.filePath, seed: pl.name, size: 48, radius: 8),
+          ),
+          title: Text(pl.name, style: const TextStyle(color: kFg1, fontSize: 14, fontWeight: FontWeight.w600)),
+          subtitle: Text('${trks.length} tracks', style: const TextStyle(color: kFg2, fontSize: 11)),
+          trailing: const Icon(Icons.chevron_right, color: kFg3),
+          onTap: () => Get.to(() => PlaylistDetailScreen(playlist: pl)),
+        );
+      },
+    );
   }
 
   void _createPlaylist() {
@@ -731,6 +1046,17 @@ class _LibraryScreenState extends State<LibraryScreen>
       ),
     );
   }
+
+  void _createSmartPlaylist({Playlist? editing}) {
+    showModalBottomSheet(
+      context: Get.context!,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => SmartPlaylistSheet(editing: editing),
+    );
+  }
+
+  void _editSmartPlaylist(Playlist pl) => _createSmartPlaylist(editing: pl);
 
   Widget _lovedList() {
     return Obx(() {
@@ -811,31 +1137,68 @@ class _LibraryScreenState extends State<LibraryScreen>
     return Obx(() {
       final scanning = LibraryController.inst.isScanning.value;
       if (scanning) return _scanningState();
-      return Center(child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.music_off, color: kFg3, size: 56),
-          const SizedBox(height: 16),
-          const Text('No music yet', style: TextStyle(color: kFg1, fontSize: 20, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
-          const Text('Scan your device or choose folders to include', textAlign: TextAlign.center, style: TextStyle(color: kFg2, fontSize: 13)),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.search),
-            label: const Text('Scan device'),
-            style: ElevatedButton.styleFrom(backgroundColor: kBrandOrange, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14)),
-            onPressed: () => LibraryController.inst.scanLibrary(),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.folder_special, color: kFg2),
-            label: const Text('Choose folders', style: TextStyle(color: kFg2)),
-            style: OutlinedButton.styleFrom(side: const BorderSide(color: kBorder), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
-            onPressed: () => Get.to(() => const FolderPickerScreen()),
-          ),
-        ]),
-      ));
+      return _emptyTabState('tracks');
     });
+  }
+
+  Widget _emptyTabState(String tab) {
+    final iconMap = {
+      'tracks':    Icons.music_note_outlined,
+      'albums':    Icons.album_outlined,
+      'artists':   Icons.mic_none_outlined,
+      'playlists': Icons.playlist_add_outlined,
+    };
+    final titleMap = {
+      'tracks':  'No tracks yet',
+      'albums':  'No albums yet',
+      'artists': 'No artists yet',
+    };
+    final subMap = {
+      'tracks':  'Scan your device to discover music',
+      'albums':  'Music will appear here once scanned',
+      'artists': 'Scan your device to find artists',
+    };
+    return Center(child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(
+          width: 80, height: 80,
+          decoration: BoxDecoration(
+            color: kBg1,
+            shape: BoxShape.circle,
+            border: Border.all(color: kBorder),
+          ),
+          child: Icon(iconMap[tab] ?? Icons.music_note_outlined, color: kFg3, size: 36),
+        ),
+        const SizedBox(height: 20),
+        Text(titleMap[tab] ?? 'Nothing here',
+            style: const TextStyle(color: kFg1, fontSize: 18, fontWeight: FontWeight.w800, fontFamily: 'Syne')),
+        const SizedBox(height: 8),
+        Text(subMap[tab] ?? 'Scan your device to discover music',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: kFg2, fontSize: 13)),
+        const SizedBox(height: 28),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.search, size: 18),
+          label: const Text('Scan device'),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: kBrandOrange, foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 13),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+          onPressed: () => LibraryController.inst.scanLibrary(),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.folder_special, color: kFg2, size: 18),
+          label: const Text('Choose folders', style: TextStyle(color: kFg2)),
+          style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: kBorder),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+          onPressed: () => Get.to(() => const FolderPickerScreen()),
+        ),
+      ]),
+    ));
   }
 
   void _showLibraryMenu() {
@@ -911,7 +1274,15 @@ class _LibraryScreenState extends State<LibraryScreen>
           for (final t in trks) AuradecAudioHandler.inst.addToQueue(t);
           Get.back();
         }),
-        _mItem(Icons.radio, 'Start artist radio', () { Get.back(); }),
+        _mItem(Icons.radio, 'Start artist radio', () {
+          // Artist radio: shuffle all tracks by this artist + similar artists
+          final q = trks.toList()..shuffle();
+          if (q.isEmpty) { Get.back(); return; }
+          AuradecAudioHandler.inst.setShuffleEnabled(true);
+          PlayerController.inst.playTrack(q.first, queue: q);
+          Get.back();
+          Get.to(() => const NowPlayingScreen(), fullscreenDialog: true);
+        }),
         _mItem(Icons.info_outline, 'Artist info & bio', () {
           Get.back();
           Get.to(() => ArtistDetailScreen(artistName: name));
@@ -979,5 +1350,13 @@ class _LibraryScreenState extends State<LibraryScreen>
     title: Text(label, style: const TextStyle(color: kFg1, fontSize: 14)),
     onTap: onTap, dense: true, minLeadingWidth: 20,
   );
+}
+
+class _Smart {
+  final String name;
+  final IconData icon;
+  final Color color;
+  final List<Track> tracks;
+  const _Smart(this.name, this.icon, this.color, this.tracks);
 }
 

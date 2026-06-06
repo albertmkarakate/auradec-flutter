@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/track.dart';
 import '../core/constants.dart';
 import '../services/indexer_service.dart';
+import '../services/smart_playlist_engine.dart';
+import '../services/tag_writer_service.dart';
 
 // ignore_for_file: avoid_function_literals_in_foreach_calls
 
@@ -29,6 +31,12 @@ class LibraryController extends GetxController {
   final lovedPaths = <String>{}.obs;
   final playlists  = <Playlist>[].obs;
 
+  // Followed artists
+  final followedArtists = <String>{}.obs;
+
+  // Artist separator config — persisted, used when building artist map
+  final artistSeparators = <String>{'feat.', 'ft.', '&', ',', '—'}.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -42,7 +50,6 @@ class LibraryController extends GetxController {
     isScanning.value = true;
 
     final prefs = await SharedPreferences.getInstance();
-    final scannedOnce = prefs.getBool(kPrefScannedOnce) ?? false;
 
     // Listen to progress
     final sub = IndexerService.inst.progress.listen((p) {
@@ -109,8 +116,27 @@ class LibraryController extends GetxController {
   }
 
   String _primaryArtist(String artist) {
-    // Split "Burna Boy feat. Wizkid" → "Burna Boy"
-    return artist.split(RegExp(r'\s+(feat\.|ft\.|&|,)\s+', caseSensitive: false)).first.trim();
+    if (artistSeparators.isEmpty) return artist.trim();
+    // Escape each separator for regex and join with |
+    final escaped = artistSeparators.map((s) => RegExp.escape(s)).join('|');
+    final pattern = RegExp('\\s*($escaped)\\s*', caseSensitive: false);
+    return artist.split(pattern).first.trim();
+  }
+
+  /// Split artist string into all constituent artists using active separators.
+  List<String> splitArtists(String artist) {
+    if (artistSeparators.isEmpty) return [artist.trim()];
+    final escaped = artistSeparators.map((s) => RegExp.escape(s)).join('|');
+    final pattern = RegExp('\\s*($escaped)\\s*', caseSensitive: false);
+    return artist.split(pattern).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+  }
+
+  /// Update separators, persist, and rebuild derived maps.
+  Future<void> updateArtistSeparators(Set<String> seps) async {
+    artistSeparators..clear()..addAll(seps);
+    _buildDerivedMaps();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(kPrefArtistSeparators, seps.toList());
   }
 
   // ── Track stats ───────────────────────────────────────────────────
@@ -140,6 +166,67 @@ class LibraryController extends GetxController {
     await _saveTracks();
   }
 
+  // ── Bulk metadata edit ────────────────────────────────────────────
+  /// Apply shared field changes to many tracks. Only non-null fields written.
+  /// Returns count of files successfully tagged. Rebuilds Track objects so
+  /// derived album/artist maps refresh.
+  Future<int> bulkEditTags(
+    List<String> paths, {
+    String? album,
+    String? albumArtist,
+    String? artist,
+    String? genre,
+    int? year,
+  }) async {
+    final tags = <String, String>{};
+    if (album != null && album.isNotEmpty) tags['album'] = album;
+    if (albumArtist != null && albumArtist.isNotEmpty) tags['albumArtist'] = albumArtist;
+    if (artist != null && artist.isNotEmpty) tags['artist'] = artist;
+    if (genre != null && genre.isNotEmpty) tags['genre'] = genre;
+    if (year != null && year > 0) tags['year'] = '$year';
+    if (tags.isEmpty) return 0;
+
+    int ok = 0;
+    for (final p in paths) {
+      final idx = tracks.indexWhere((t) => t.path == p);
+      if (idx < 0) continue;
+      final t = tracks[idx];
+      final fsPath = t.filePath.isNotEmpty ? t.filePath : t.path;
+      final wrote = await TagWriterService.inst.writeTags(fsPath, tags);
+      if (!wrote) continue;
+      tracks[idx] = t.copyWith(
+        album: album, albumArtist: albumArtist, artist: artist,
+        genre: genre, year: year,
+      );
+      ok++;
+    }
+    if (ok > 0) {
+      _buildDerivedMaps();
+      tracks.refresh();
+      await _saveTracks();
+    }
+    return ok;
+  }
+
+  // ── Follow artists ────────────────────────────────────────────────
+
+  bool isFollowing(String name) => followedArtists.contains(name.toLowerCase());
+
+  Future<void> toggleFollowArtist(String name) async {
+    final key = name.toLowerCase();
+    if (followedArtists.contains(key)) {
+      followedArtists.remove(key);
+    } else {
+      followedArtists.add(key);
+    }
+    await _saveFollowedArtists();
+  }
+
+  Future<void> _saveFollowedArtists() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(kPrefFollowedArtists, followedArtists.toList());
+  }
+
   // ── Exclusion ─────────────────────────────────────────────────────
 
   Future<void> excludeTrack(String path) async {
@@ -156,6 +243,30 @@ class LibraryController extends GetxController {
     playlists.add(pl);
     await _savePlaylists();
     return pl;
+  }
+
+  Future<Playlist> createSmartPlaylist(String name, SmartRules rules, {String icon = 'playlist_play', String color = '#A78BFA'}) async {
+    final pl = Playlist(
+      id: DateTime.now().millisecondsSinceEpoch,
+      name: name, smart: true, rules: rules,
+      icon: icon, color: color,
+    );
+    playlists.add(pl);
+    await _savePlaylists();
+    return pl;
+  }
+
+  Future<void> updateSmartPlaylist(int id, String name, SmartRules rules, {String? icon, String? color}) async {
+    final idx = playlists.indexWhere((p) => p.id == id);
+    if (idx < 0) return;
+    final old = playlists[idx];
+    playlists[idx] = Playlist(
+      id: old.id, name: name, smart: true, rules: rules,
+      icon: icon ?? old.icon, color: color ?? old.color,
+      createdAt: old.createdAt,
+    );
+    playlists.refresh();
+    await _savePlaylists();
   }
 
   Future<void> deletePlaylist(int id) async {
@@ -188,6 +299,9 @@ class LibraryController extends GetxController {
   }
 
   List<Track> playlistTracks(Playlist pl) {
+    if (pl.smart && pl.rules != null) {
+      return evalSmart(pl.rules!, tracks.toList());
+    }
     final map = <String, Track>{for (final t in tracks) t.path: t};
     return pl.trackPaths.map((p) => map[p]).whereType<Track>().toList();
   }
@@ -234,13 +348,21 @@ class LibraryController extends GetxController {
       } catch (_) {}
     }
 
+    // Load artist separators
+    final savedSeps = prefs.getStringList(kPrefArtistSeparators);
+    if (savedSeps != null) { artistSeparators..clear()..addAll(savedSeps); }
+
     // Load excluded paths
     final excluded = prefs.getStringList(kPrefExcludedPaths) ?? [];
-    excludedPaths.value = excluded.toSet();
+    excludedPaths..clear()..addAll(excluded);
 
     // Load checked folders
     final checked = prefs.getStringList(kPrefCheckedFolders) ?? [];
     checkedFolders.value = checked;
+
+    // Load followed artists
+    final followed = prefs.getStringList(kPrefFollowedArtists) ?? [];
+    followedArtists..clear()..addAll(followed);
 
     await _loadPlaylists();
 

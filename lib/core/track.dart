@@ -49,6 +49,25 @@ class Track {
     this.loved = false,
   });
 
+  Track copyWith({
+    String? title, String? artist, String? albumArtist, String? album,
+    String? genre, int? year, int? trackNo, int? discNo, String? comment,
+  }) {
+    final t = Track(
+      path: path, filePath: filePath,
+      title: title ?? this.title, artist: artist ?? this.artist,
+      albumArtist: albumArtist ?? this.albumArtist, album: album ?? this.album,
+      genre: genre ?? this.genre, year: year ?? this.year,
+      trackNo: trackNo ?? this.trackNo, discNo: discNo ?? this.discNo,
+      durationMs: durationMs, bitrate: bitrate, sampleRate: sampleRate,
+      fileSize: fileSize, codec: codec, isLossless: isLossless,
+      comment: comment ?? this.comment,
+      rating: rating, plays: plays, lastPlayed: lastPlayed, loved: loved,
+    );
+    t.artUri = artUri;
+    return t;
+  }
+
   String get filename {
     final i = path.lastIndexOf('/');
     return i >= 0 ? path.substring(i + 1) : path;
@@ -87,18 +106,68 @@ class Track {
   int get hashCode => path.hashCode;
 }
 
+// ── Smart playlist models ─────────────────────────────────────────────────────
+
+/// One filter condition: { field, op, value }
+class SmartCondition {
+  final String field; // rating | plays | durationSec | year | lastDays | genre | artist | album | title
+  final String op;    // num: gte/lte/gt/lt/eq  text: contains/is/not/starts  days: within/before/never
+  final String value;
+  const SmartCondition({required this.field, required this.op, required this.value});
+
+  Map<String, dynamic> toJson() => {'field': field, 'op': op, 'value': value};
+  factory SmartCondition.fromJson(Map<String, dynamic> j) =>
+      SmartCondition(field: j['field'] ?? '', op: j['op'] ?? '', value: j['value'] ?? '');
+}
+
+/// Top-level smart-playlist rule object.
+class SmartRules {
+  final String match;              // 'all' | 'any'
+  final List<SmartCondition> conditions;
+  final String sort;               // rating | plays | recent | added | duration | title
+
+  const SmartRules({this.match = 'all', this.conditions = const [], this.sort = 'title'});
+
+  Map<String, dynamic> toJson() => {
+    'match': match,
+    'conditions': conditions.map((c) => c.toJson()).toList(),
+    'sort': sort,
+  };
+  factory SmartRules.fromJson(Map<String, dynamic> j) => SmartRules(
+    match: j['match'] ?? 'all',
+    conditions: ((j['conditions'] as List?) ?? [])
+        .map((e) => SmartCondition.fromJson(e as Map<String, dynamic>)).toList(),
+    sort: j['sort'] ?? 'title',
+  );
+}
+
+// ── Playlist ──────────────────────────────────────────────────────────────────
+
 class Playlist {
   final int id;
   String name;
-  final List<String> trackPaths;
+  final List<String> trackPaths; // manual playlist paths (ignored when smart==true)
   final int createdAt;
+  final bool smart;
+  final SmartRules? rules;       // non-null iff smart==true
+  final String icon;
+  final String color;            // hex e.g. '#A78BFA'
 
-  Playlist({required this.id, required this.name, List<String>? trackPaths, int? createdAt})
-      : trackPaths = trackPaths ?? [],
+  Playlist({
+    required this.id,
+    required this.name,
+    List<String>? trackPaths,
+    int? createdAt,
+    this.smart = false,
+    this.rules,
+    this.icon = 'playlist_play',
+    this.color = '#FF5C1A',
+  })  : trackPaths = trackPaths ?? [],
         createdAt = createdAt ?? DateTime.now().millisecondsSinceEpoch;
 
   Map<String, dynamic> toJson() => {
     'id': id, 'name': name, 'trackPaths': trackPaths, 'createdAt': createdAt,
+    'smart': smart, 'rules': rules?.toJson(), 'icon': icon, 'color': color,
   };
 
   factory Playlist.fromJson(Map<String, dynamic> j) => Playlist(
@@ -106,6 +175,10 @@ class Playlist {
     name: j['name'] ?? 'Untitled',
     trackPaths: (j['trackPaths'] as List?)?.cast<String>() ?? [],
     createdAt: j['createdAt'] ?? 0,
+    smart: j['smart'] == true,
+    rules: j['rules'] != null ? SmartRules.fromJson(j['rules'] as Map<String, dynamic>) : null,
+    icon: j['icon'] ?? 'playlist_play',
+    color: j['color'] ?? '#FF5C1A',
   );
 
   @override
