@@ -1,10 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import '../../core/constants.dart';
 import '../../core/track.dart';
 import '../../controllers/library_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../services/audio_handler.dart';
+import '../../services/last_fm_service.dart';
+import '../../services/musicbrainz_service.dart';
 import '../widgets/album_art.dart';
 import '../widgets/bulk_edit_sheet.dart';
 import 'artist_detail_screen.dart';
@@ -23,6 +27,64 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   bool _grid = false;
   bool _selectMode = false;
   final _selected = <String>{};
+
+  // Album info
+  LastFmAlbumInfo? _lfInfo;
+  String? _wikiBlurb;
+  String? _mbReleaseId;
+  bool _infoLoading = false;
+  bool _bioExpanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchInfo();
+  }
+
+  Future<void> _fetchInfo() async {
+    if (_infoLoading) return;
+    if (mounted) setState(() => _infoLoading = true);
+    final tracks = widget.tracks;
+    final artist = tracks.isNotEmpty
+        ? (tracks.first.albumArtist.isNotEmpty ? tracks.first.albumArtist : tracks.first.artist)
+            .split(RegExp(r'\s+(feat\.|ft\.|&|,)\s+', caseSensitive: false)).first.trim()
+        : '';
+
+    // Parallel fetch: Last.fm + MusicBrainz + Wikipedia
+    await Future.wait([
+      LastFmService.inst.albumInfo(artist, widget.albumName).then((info) {
+        if (mounted) setState(() => _lfInfo = info);
+      }).catchError((_) {}),
+      MusicBrainzService.inst.searchRelease(widget.albumName, artist).then((releases) {
+        if (releases.isNotEmpty && mounted) {
+          setState(() {
+            _mbReleaseId = releases.first.id;
+          });
+        }
+      }).catchError((_) {}),
+      _fetchWikiBlurb(widget.albumName, artist),
+    ]);
+
+    if (mounted) setState(() => _infoLoading = false);
+  }
+
+  Future<void> _fetchWikiBlurb(String album, String artist) async {
+    try {
+      final query = Uri.encodeComponent('$album $artist album');
+      final res = await http.get(
+        Uri.parse('https://en.wikipedia.org/api/rest_v1/page/summary/$query'),
+        headers: {'User-Agent': 'Auradec/1.0'}).timeout(const Duration(seconds: 6));
+      if (res.statusCode == 200) {
+        final j = jsonDecode(res.body) as Map<String, dynamic>;
+        if (j['type'] != 'disambiguation') {
+          final extract = j['extract'] as String?;
+          if (extract != null && extract.isNotEmpty && mounted) {
+            setState(() => _wikiBlurb = extract);
+          }
+        }
+      }
+    } catch (_) {}
+  }
 
   List<Track> get _sorted {
     final lib = LibraryController.inst;
@@ -185,6 +247,15 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             ]),
           )),
 
+          // ── Album info panel ─────────────────────────────────────
+          if (_infoLoading)
+            const SliverToBoxAdapter(child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: LinearProgressIndicator(color: kBrandOrange, backgroundColor: kBg2),
+            ))
+          else if (_lfInfo != null || _wikiBlurb != null || _mbReleaseId != null)
+            SliverToBoxAdapter(child: _infoPanel()),
+
           // Tracklist header
           SliverToBoxAdapter(child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
@@ -241,6 +312,102 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
             : null,
       );
     });
+  }
+
+  // ── Album info panel ─────────────────────────────────────────────────────
+
+  Widget _infoPanel() {
+    final lf      = _lfInfo;
+    final tags    = lf?.tags ?? [];
+    final bio     = lf?.wiki ?? _wikiBlurb;
+    final mbId    = _mbReleaseId;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kBg1, borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Tags row
+          if (tags.isNotEmpty) ...[
+            Wrap(spacing: 6, runSpacing: 6, children: tags.map((t) =>
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: kBrandGold.withAlpha(20), borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: kBrandGold.withAlpha(50))),
+                child: Text(t, style: const TextStyle(color: kBrandGold, fontSize: 10, fontFamily: 'Barlow')),
+              )).toList()),
+            const SizedBox(height: 12),
+          ],
+          // Bio
+          if (bio != null) ...[
+            Row(children: [
+              const Icon(Icons.auto_stories_outlined, color: kFg3, size: 12),
+              const SizedBox(width: 6),
+              const Text('ABOUT', style: TextStyle(color: kFg3, fontSize: 9, letterSpacing: 2, fontFamily: 'Barlow')),
+              const Spacer(),
+              if (bio.length > 350)
+                GestureDetector(
+                  onTap: () => setState(() => _bioExpanded = !_bioExpanded),
+                  child: Text(_bioExpanded ? 'Less' : 'More',
+                      style: const TextStyle(color: kBrandOrange, fontSize: 11))),
+            ]),
+            const SizedBox(height: 8),
+            Text(bio,
+                maxLines: _bioExpanded ? null : 4,
+                overflow: _bioExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                style: const TextStyle(color: kFg2, fontSize: 12, height: 1.65)),
+            const SizedBox(height: 12),
+          ],
+          // External links row
+          Wrap(spacing: 8, children: [
+            if (mbId != null)
+              _infoLink('MusicBrainz', kBrandGreen, () => _openUrl(
+                'https://musicbrainz.org/release/$mbId')),
+            _infoLink('Last.fm', kBrandCoral, () => _openUrl(
+                'https://www.last.fm/music/${Uri.encodeComponent(_artistName())}/${Uri.encodeComponent(widget.albumName)}')),
+            _infoLink('Wikipedia', const Color(0xFF6E9EBF), () => _openUrl(
+                'https://en.wikipedia.org/wiki/${Uri.encodeComponent(widget.albumName)}')),
+            // Refresh
+            GestureDetector(
+              onTap: () { setState(() { _lfInfo = null; _wikiBlurb = null; _mbReleaseId = null; }); _fetchInfo(); },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: const Icon(Icons.refresh, color: kFg3, size: 14)),
+            ),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  String _artistName() {
+    final t = widget.tracks.isNotEmpty ? widget.tracks.first : null;
+    return (t?.albumArtist.isNotEmpty == true ? t!.albumArtist : t?.artist ?? '')
+        .split(RegExp(r'\s+(feat\.|ft\.|&|,)\s+', caseSensitive: false)).first.trim();
+  }
+
+  Widget _infoLink(String label, Color color, VoidCallback onTap) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(20), borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withAlpha(60))),
+      child: Text(label, style: TextStyle(color: color, fontSize: 10, fontFamily: 'Barlow', fontWeight: FontWeight.w600)),
+    ),
+  );
+
+  void _openUrl(String url) {
+    // url_launcher not in pubspec — show snack with URL for now
+    Get.snackbar('', '',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: kBg2, colorText: kFg1, duration: const Duration(seconds: 3),
+      messageText: Text(url, style: const TextStyle(color: kFg2, fontSize: 11)),
+      titleText: const SizedBox.shrink());
   }
 
   Widget _selectionBar() => Container(
